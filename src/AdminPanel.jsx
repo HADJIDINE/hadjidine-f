@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
+// 🌐 URL de ton Backend Spring Boot déployé sur Render
+const API_BASE_URL = 'https://hadjidine-b.onrender.com';
+
 const AdminPanel = () => {
   const [users, setUsers] = useState([]);
   const [newFamilyCode, setNewFamilyCode] = useState('');
@@ -12,7 +15,7 @@ const AdminPanel = () => {
   // Charger la liste complète des membres
   const fetchUsers = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/admin/users', {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error('Erreur lors du chargement des membres');
@@ -34,7 +37,7 @@ const AdminPanel = () => {
       return;
     }
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}/toggle-status`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/toggle-status`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -54,7 +57,7 @@ const AdminPanel = () => {
     if (!window.confirm('Supprimer définitivement ce membre ?')) return;
 
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -72,7 +75,7 @@ const AdminPanel = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:8080/api/admin/users/${userId}/reset-password?newPassword=${encodeURIComponent(newPassword)}`,
+        `${API_BASE_URL}/api/admin/users/${userId}/reset-password?newPassword=${encodeURIComponent(newPassword)}`,
         {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}` },
@@ -92,7 +95,7 @@ const AdminPanel = () => {
     setError('');
 
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/family-code?code=${encodeURIComponent(newFamilyCode)}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/family-code?code=${encodeURIComponent(newFamilyCode)}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
