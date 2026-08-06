@@ -1,5 +1,8 @@
 import React, { useState, useRef } from 'react';
 
+// 🌐 URL de ton Backend Spring Boot sur Render
+const API_BASE_URL = 'https://hadjidine-b.onrender.com';
+
 const Auth = ({ onLoginSuccess }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -97,7 +100,7 @@ const Auth = ({ onLoginSuccess }) => {
     setErrorMessage('');
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/register', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(registerData),
@@ -125,7 +128,7 @@ const Auth = ({ onLoginSuccess }) => {
     setErrorMessage('');
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginData),
