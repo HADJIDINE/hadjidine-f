@@ -6,41 +6,43 @@ const Chat = () => {
   const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Restauration de l'utilisateur actif
+  // 💾 SAUVEGARDE & RESTAURATION DE L'UTILISATEUR SÉLECTIONNÉ
   const [selectedUser, setSelectedUser] = useState(() => {
     const savedUser = localStorage.getItem('chat_selected_user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
   const [loading, setLoading] = useState(false);
+
+  // Thème (Clair / Sombre / Auto)
   const [theme, setTheme] = useState('light');
 
-  // Emojis, réactions & médias
+  // Emojis & Réactions
   const [showStickers, setShowStickers] = useState(false);
   const stickers = ['👍', '❤️', '😂', '🔥', '🎉', '🙏', '👏', '🤝', '⚡', '💡', '😎', '👌'];
   const reactionsList = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
-  // Gestion des appels
+  // Appels & Média
   const [activeCall, setActiveCall] = useState(null);
   const [incomingCall, setIncomingCall] = useState(null);
   const handledCallsRef = useRef(new Set());
   const localStreamRef = useRef(null);
 
-  // Enregistrement vocal
+  // Enregistrement Vocal
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
 
-  // État UI et notifications
+  // Indicateurs & Menus
   const [isTypingRemote, setIsTypingRemote] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const [deletedMsgIds, setDeletedMsgIds] = useState([]);
   const [unreadUsers, setUnreadUsers] = useState({});
   const [openMenuId, setOpenMenuId] = useState(null);
 
-  // Réactions
+  // Stockage des réactions
   const [reactionsMap, setReactionsMap] = useState({});
   const [activeReactionDetailsMsgId, setActiveReactionDetailsMsgId] = useState(null);
 
@@ -52,10 +54,14 @@ const Chat = () => {
   const currentUserEmail = localStorage.getItem('userEmail') || '';
   const userRole = localStorage.getItem('userRole') || 'USER';
 
+  // Infos de l'utilisateur connecté
   const currentUser = users.find((u) => u.email === currentUserEmail);
   const currentUserName = currentUser ? `${currentUser.prenom} ${currentUser.nom}` : currentUserEmail;
+
+  // Vérification Administrateur
   const isAdmin = userRole === 'ADMIN' || currentUserEmail.includes('hadjidine');
 
+  // Avatars par défaut
   const defaultAvatarMale = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%230288d1'/><circle cx='32' cy='23' r='12' fill='%23fff'/><path d='M12 52c0-11 9-20 20-20s20 9 20 20z' fill='%23fff'/></svg>";
   const defaultAvatarFemale = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23e91e63'/><circle cx='32' cy='23' r='12' fill='%23fff'/><path d='M12 52c0-11 9-20 20-20s20 9 20 20z' fill='%23fff'/></svg>";
 
@@ -105,23 +111,25 @@ const Chat = () => {
     return false;
   };
 
+  // Badge Administrateur
   const VerifiedBadge = () => (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="#1DA1F2" style={{ marginLeft: '4px', verticalAlign: 'middle', display: 'inline-block' }}>
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#FFF"/>
     </svg>
   );
 
-  // 1. Charger la liste des membres
+  // 1. Charger la liste des utilisateurs
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const response = await fetch('https://hadjidine-b.onrender.com/api/users', { headers });
+        const response = await fetch('https://hadjidine-b.onrender.com', { headers });
         if (response.ok) {
           const data = await response.json();
           const filtered = data.filter((u) => u.email !== currentUserEmail);
           setUsers(filtered);
 
+          // Si l'utilisateur sélectionné était stocké, met à jour ses infos fraîches
           if (selectedUser) {
             const updatedSelected = filtered.find((u) => u.email === selectedUser.email);
             if (updatedSelected) setSelectedUser(updatedSelected);
@@ -136,7 +144,7 @@ const Chat = () => {
     return () => clearInterval(interval);
   }, [token, currentUserEmail]);
 
-  // 2. Fetch Messages & Sync signaux
+  // 2. Fetch Messages & Synchronisation des réactions
   const fetchMessages = async () => {
     try {
       const receiver = selectedUser ? selectedUser.email : 'GENERAL';
@@ -197,7 +205,10 @@ const Chat = () => {
             }
           }
 
-          if (msg.sender !== currentUserEmail && (selectedUser ? msg.sender === selectedUser.email : true)) {
+          if (
+            msg.sender !== currentUserEmail &&
+            (selectedUser ? msg.sender === selectedUser.email : true)
+          ) {
             if (content === '[TYPING]') isOtherTyping = true;
             if (content === '[STOP_TYPING]') isOtherTyping = false;
           }
@@ -206,7 +217,7 @@ const Chat = () => {
         setIsTypingRemote(isOtherTyping);
       }
     } catch (err) {
-      console.error('Erreur synchronisation des messages:', err);
+      console.error('Erreur chargement messages:', err);
     }
   };
 
@@ -216,17 +227,19 @@ const Chat = () => {
     return () => clearInterval(interval);
   }, [selectedUser, activeCall, incomingCall]);
 
+  // Défilement automatique vers le bas + défilement après rechargement
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedUser, messages.length]);
 
+  // 💾 FONCTION POUR SELECTIONNER ET SAUVEGARDER L'UTILISATEUR SÉLECTIONNÉ
   const handleSelectUser = (user) => {
     setSelectedUser(user);
     if (user) {
       localStorage.setItem('chat_selected_user', JSON.stringify(user));
       setUnreadUsers((prev) => ({ ...prev, [user.email]: false }));
     } else {
-      localStorage.removeItem('chat_selected_user');
+      localStorage.removeItem('chat_selected_user'); // Groupe Général
     }
   };
 
@@ -259,7 +272,7 @@ const Chat = () => {
       }
       await fetchMessages();
     } catch (err) {
-      console.error('Erreur lors de l\'envoi:', err);
+      console.error('Erreur d\'envoi:', err);
     }
   };
 
@@ -318,7 +331,7 @@ const Chat = () => {
       setRecordingTime(0);
       timerRef.current = setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
     } catch (err) {
-      alert('Microphone non disponible.');
+      alert('Aucun microphone détecté.');
     }
   };
 
@@ -337,7 +350,7 @@ const Chat = () => {
       localStreamRef.current = stream;
       return true;
     } catch (err) {
-      alert(`Matériel multimédia indisponible.`);
+      alert(`Impossible d'initier l'appel : Matériel non détecté.`);
       return false;
     }
   };
@@ -424,11 +437,17 @@ const Chat = () => {
       }}
     >
       {/* SIDEBAR */}
-      <div style={{ ...styles.sidebar, borderColor: isDarkMode ? '#333' : '#eee' }}>
-        <div style={{ ...styles.searchBox, borderColor: isDarkMode ? '#333' : '#eee' }}>
+      <div
+        style={{
+          ...styles.sidebar,
+          backgroundColor: isDarkMode ? '#252526' : '#fafafa',
+          borderRightColor: isDarkMode ? '#333' : '#eee',
+        }}
+      >
+        <div style={{ ...styles.searchBox, borderBottomColor: isDarkMode ? '#333' : '#eee' }}>
           <input
             type="text"
-            placeholder="🔍 Rechercher..."
+            placeholder="🔍 Rechercher un membre..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
@@ -445,13 +464,18 @@ const Chat = () => {
             onClick={() => handleSelectUser(null)}
             style={{
               ...styles.userCard,
-              backgroundColor: selectedUser === null ? (isDarkMode ? '#0d47a1' : '#e3f2fd') : 'transparent',
+              backgroundColor:
+                selectedUser === null
+                  ? isDarkMode
+                    ? '#0d47a1'
+                    : '#e3f2fd'
+                  : 'transparent',
             }}
           >
             <div style={styles.avatarGeneral}>📢</div>
             <div>
               <strong>Groupe Familial</strong>
-              <div style={{ ...styles.subText, color: isDarkMode ? '#aaa' : '#888' }}>Discussion Générale</div>
+              <div style={{ ...styles.subText, color: isDarkMode ? '#aaa' : '#888' }}>Chat Général</div>
             </div>
           </div>
 
@@ -469,11 +493,20 @@ const Chat = () => {
                 onClick={() => handleSelectUser(user)}
                 style={{
                   ...styles.userCard,
-                  backgroundColor: selectedUser?.email === user.email ? (isDarkMode ? '#0d47a1' : '#e3f2fd') : 'transparent',
+                  backgroundColor:
+                    selectedUser?.email === user.email
+                      ? isDarkMode
+                        ? '#0d47a1'
+                        : '#e3f2fd'
+                      : 'transparent',
                 }}
               >
                 <div style={{ position: 'relative' }}>
-                  <img src={user.avatarUrl || fallbackAvatar} alt="Avatar" style={styles.avatar} />
+                  <img
+                    src={user.avatarUrl || fallbackAvatar}
+                    alt="Avatar"
+                    style={styles.avatar}
+                  />
                   {isUnread && <span style={styles.unreadBadge} />}
                 </div>
                 <div>
@@ -490,10 +523,16 @@ const Chat = () => {
         </div>
       </div>
 
-      {/* ZONE PRINCIPALE DE CHAT */}
+      {/* ZONE DE CHAT */}
       <div style={styles.chatArea}>
-        {/* HEADER DE LA CONVERSATION */}
-        <div style={{ ...styles.chatHeader, borderColor: isDarkMode ? '#333' : '#eee' }}>
+        {/* HEADER */}
+        <div
+          style={{
+            ...styles.chatHeader,
+            backgroundColor: isDarkMode ? '#2d2d2d' : '#f9f9f9',
+            borderBottomColor: isDarkMode ? '#333' : '#eee',
+          }}
+        >
           {selectedUser ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <img
@@ -503,7 +542,8 @@ const Chat = () => {
               />
               <div>
                 <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', color: isDarkMode ? '#fff' : '#333' }}>
-                  {selectedUser.prenom} {selectedUser.nom} {isUserAdmin(selectedUser.email) && <VerifiedBadge />}
+                  {selectedUser.prenom} {selectedUser.nom}
+                  {isUserAdmin(selectedUser.email) && <VerifiedBadge />}
                 </h3>
                 <small style={{ color: isUserOnline(selectedUser) ? '#4caf50' : isDarkMode ? '#aaa' : '#888' }}>
                   {isUserOnline(selectedUser) ? '● En ligne' : formatLastSeen(selectedUser.lastActive)}
@@ -514,7 +554,24 @@ const Chat = () => {
             <h3 style={{ margin: 0, color: isDarkMode ? '#fff' : '#333' }}>📢 Groupe Familial (Général)</h3>
           )}
 
+          {/* ZONE DROITE */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 'bold', color: isDarkMode ? '#e0e0e0' : '#555', display: 'flex', alignItems: 'center' }}>
+              👤 {currentUserName} {isAdmin && <VerifiedBadge />}
+            </div>
+
+            <button
+              onClick={toggleTheme}
+              style={{
+                ...styles.btnCall,
+                backgroundColor: isDarkMode ? '#444' : '#eceff1',
+                color: isDarkMode ? '#fff' : '#333',
+              }}
+              title={`Mode actuel : ${theme.toUpperCase()}`}
+            >
+              {theme === 'light' ? '☀️' : theme === 'dark' ? '🌙' : '🔄'}
+            </button>
+
             {selectedUser && (
               <div style={styles.callButtons}>
                 <button onClick={() => startCall('audio')} style={styles.btnCall} title="Appel Audio">
@@ -525,17 +582,10 @@ const Chat = () => {
                 </button>
               </div>
             )}
-            <button
-              onClick={toggleTheme}
-              style={{ ...styles.btnCall, backgroundColor: isDarkMode ? '#444' : '#eceff1', color: isDarkMode ? '#fff' : '#333' }}
-              title={`Thème: ${theme}`}
-            >
-              {theme === 'light' ? '☀️' : theme === 'dark' ? '🌙' : '🔄'}
-            </button>
           </div>
         </div>
 
-        {/* FLUX DE MESSAGES */}
+        {/* MESSAGES */}
         <div style={styles.messagesBox} ref={chatContainerRef}>
           {messages.map((msg, index) => {
             const isMe = msg.sender === currentUserEmail;
@@ -726,7 +776,7 @@ const Chat = () => {
 
         {/* EMOJIS / STICKERS */}
         {showStickers && (
-          <div style={{ ...styles.stickerBar, backgroundColor: isDarkMode ? '#252526' : '#fff', borderColor: isDarkMode ? '#333' : '#eee' }}>
+          <div style={{ ...styles.stickerBar, backgroundColor: isDarkMode ? '#252526' : '#fff', borderTopColor: isDarkMode ? '#333' : '#eee' }}>
             {stickers.map((stk, i) => (
               <span key={i} onClick={() => setInputMessage((prev) => prev + stk)} style={{ cursor: 'pointer', fontSize: '20px' }}>
                 {stk}
@@ -735,9 +785,9 @@ const Chat = () => {
           </div>
         )}
 
-        {/* BARRE DE CITATION / RÉPONSE */}
+        {/* CITER LE MESSAGE */}
         {replyingTo && (
-          <div style={{ ...styles.replyBar, backgroundColor: isDarkMode ? '#1a365d' : '#e3f2fd', borderColor: isDarkMode ? '#2b6cb0' : '#bbdefb' }}>
+          <div style={{ ...styles.replyBar, backgroundColor: isDarkMode ? '#1a365d' : '#e3f2fd', borderTopColor: isDarkMode ? '#2b6cb0' : '#bbdefb' }}>
             <div>
               <small style={{ fontWeight: 'bold' }}>Réponse à {getUserDisplayName(replyingTo.sender)} :</small>
               <div style={{ fontSize: '12px', color: isDarkMode ? '#ccc' : '#555' }}>{replyingTo.content}</div>
@@ -748,8 +798,8 @@ const Chat = () => {
           </div>
         )}
 
-        {/* FORMULAIRE D'ENVOI DE MESSAGE */}
-        <form onSubmit={handleSendMessage} style={{ ...styles.inputForm, borderColor: isDarkMode ? '#333' : '#eee' }}>
+        {/* FORMULAIRE D'ENVOI */}
+        <form onSubmit={handleSendMessage} style={{ ...styles.inputForm, borderTopColor: isDarkMode ? '#333' : '#eee' }}>
           <button type="button" onClick={() => setShowStickers(!showStickers)} style={styles.toolBtn} title="Emoji">
             😊
           </button>
@@ -790,7 +840,7 @@ const Chat = () => {
         </form>
       </div>
 
-      {/* OVERLAY D'APPEL ENTRANT */}
+      {/* POP-UPS D'APPEL */}
       {incomingCall && (
         <div style={styles.callOverlay}>
           <div style={{ ...styles.callModal, backgroundColor: isDarkMode ? '#2d2d2d' : '#fff', color: isDarkMode ? '#fff' : '#333' }}>
@@ -809,7 +859,6 @@ const Chat = () => {
         </div>
       )}
 
-      {/* OVERLAY D'APPEL EN COURS / EMIS */}
       {activeCall && (
         <div style={styles.callOverlay}>
           <div style={{ ...styles.callModal, backgroundColor: isDarkMode ? '#2d2d2d' : '#fff', color: isDarkMode ? '#fff' : '#333' }}>
@@ -827,7 +876,6 @@ const Chat = () => {
   );
 };
 
-// FEUILLE DE STYLE EN OBJET JAVASCRIPT
 const styles = {
   chatLayout: { display: 'flex', height: '85vh', maxWidth: '1100px', margin: '15px auto', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', overflow: 'hidden', fontFamily: 'Segoe UI, sans-serif' },
   sidebar: { width: '320px', borderRight: '1px solid', display: 'flex', flexDirection: 'column' },
