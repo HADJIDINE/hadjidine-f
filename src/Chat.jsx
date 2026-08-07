@@ -56,7 +56,9 @@ const Chat = () => {
 
   // Infos de l'utilisateur connecté
   const currentUser = users.find((u) => u.email === currentUserEmail);
-  const currentUserName = currentUser ? `${currentUser.prenom} ${currentUser.nom}` : currentUserEmail;
+  const currentUserName = currentUser && (currentUser.prenom || currentUser.nom)
+    ? `${currentUser.prenom || ''} ${currentUser.nom || ''}`.trim()
+    : currentUserEmail;
 
   // Vérification Administrateur
   const isAdmin = userRole === 'ADMIN' || currentUserEmail.includes('hadjidine');
@@ -87,10 +89,14 @@ const Chat = () => {
     return `En ligne il y a ${Math.floor(diffInSeconds / 86400)} j`;
   };
 
+  // ✅ Priorise le Prénom + Nom au lieu de l'E-mail
   const getUserDisplayName = (email) => {
     if (email === currentUserEmail) return 'Moi';
     const foundUser = users.find((u) => u.email === email);
-    return foundUser ? `${foundUser.prenom} ${foundUser.nom}` : email;
+    if (foundUser && (foundUser.prenom || foundUser.nom)) {
+      return `${foundUser.prenom || ''} ${foundUser.nom || ''}`.trim();
+    }
+    return email;
   };
 
   const isUserAdmin = (email) => {
@@ -118,18 +124,17 @@ const Chat = () => {
     </svg>
   );
 
-  // 1. Charger la liste des utilisateurs
+  // 1. ✅ CORRECTION CORRIGÉE : Charger la liste des utilisateurs via /api/users
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const response = await fetch('https://hadjidine-b.onrender.com', { headers });
+        const response = await fetch('https://hadjidine-b.onrender.com/api/users', { headers });
         if (response.ok) {
           const data = await response.json();
           const filtered = data.filter((u) => u.email !== currentUserEmail);
           setUsers(filtered);
 
-          // Si l'utilisateur sélectionné était stocké, met à jour ses infos fraîches
           if (selectedUser) {
             const updatedSelected = filtered.find((u) => u.email === selectedUser.email);
             if (updatedSelected) setSelectedUser(updatedSelected);
@@ -144,7 +149,7 @@ const Chat = () => {
     return () => clearInterval(interval);
   }, [token, currentUserEmail]);
 
-  // 2. Fetch Messages & Synchronisation des réactions
+  // 2. Fetch Messages & Synchronisation des réactions / appels
   const fetchMessages = async () => {
     try {
       const receiver = selectedUser ? selectedUser.email : 'GENERAL';
@@ -187,6 +192,7 @@ const Chat = () => {
             }
           }
 
+          // ✅ Gestion synchrone du signalement d'appel (Raccrocher / Refuser / Missed)
           if ((msg.receiver === currentUserEmail || msg.receiver === 'GENERAL') && !handledCallsRef.current.has(msgKey)) {
             if (content.startsWith('[CALL_REQ_AUDIO]') && !activeCall && !incomingCall) {
               setIncomingCall({ caller: msg.sender, type: 'audio' });
@@ -227,19 +233,17 @@ const Chat = () => {
     return () => clearInterval(interval);
   }, [selectedUser, activeCall, incomingCall]);
 
-  // Défilement automatique vers le bas + défilement après rechargement
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedUser, messages.length]);
 
-  // 💾 FONCTION POUR SELECTIONNER ET SAUVEGARDER L'UTILISATEUR SÉLECTIONNÉ
   const handleSelectUser = (user) => {
     setSelectedUser(user);
     if (user) {
       localStorage.setItem('chat_selected_user', JSON.stringify(user));
       setUnreadUsers((prev) => ({ ...prev, [user.email]: false }));
     } else {
-      localStorage.removeItem('chat_selected_user'); // Groupe Général
+      localStorage.removeItem('chat_selected_user');
     }
   };
 
@@ -436,7 +440,7 @@ const Chat = () => {
         color: isDarkMode ? '#e0e0e0' : '#333',
       }}
     >
-      {/* SIDEBAR */}
+      {/* SIDEBAR AVEC LISTE DES MEMBRES */}
       <div
         style={{
           ...styles.sidebar,
@@ -460,6 +464,7 @@ const Chat = () => {
         </div>
 
         <div style={styles.userList}>
+          {/* Groupe Familial Général */}
           <div
             onClick={() => handleSelectUser(null)}
             style={{
@@ -481,6 +486,7 @@ const Chat = () => {
 
           <hr style={{ border: 'none', borderTop: `1px solid ${isDarkMode ? '#333' : '#eee'}`, margin: '8px 0' }} />
 
+          {/* Rendu dynamique des membres */}
           {filteredUsers.map((user) => {
             const isUnread = unreadUsers[user.email];
             const hasAdminBadge = isUserAdmin(user.email);
@@ -511,7 +517,7 @@ const Chat = () => {
                 </div>
                 <div>
                   <strong style={{ fontWeight: isUnread ? '900' : 'normal', color: isDarkMode ? '#fff' : '#333' }}>
-                    {user.prenom} {user.nom} {hasAdminBadge && <VerifiedBadge />}
+                    {user.prenom || user.nom ? `${user.prenom || ''} ${user.nom || ''}` : user.email} {hasAdminBadge && <VerifiedBadge />}
                   </strong>
                   <div style={{ fontSize: '12px', color: online ? '#4caf50' : isDarkMode ? '#aaa' : '#888' }}>
                     {online ? '● En ligne' : formatLastSeen(user.lastActive)}
@@ -542,7 +548,7 @@ const Chat = () => {
               />
               <div>
                 <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', color: isDarkMode ? '#fff' : '#333' }}>
-                  {selectedUser.prenom} {selectedUser.nom}
+                  {selectedUser.prenom || selectedUser.nom ? `${selectedUser.prenom || ''} ${selectedUser.nom || ''}` : selectedUser.email}
                   {isUserAdmin(selectedUser.email) && <VerifiedBadge />}
                 </h3>
                 <small style={{ color: isUserOnline(selectedUser) ? '#4caf50' : isDarkMode ? '#aaa' : '#888' }}>
@@ -554,7 +560,7 @@ const Chat = () => {
             <h3 style={{ margin: 0, color: isDarkMode ? '#fff' : '#333' }}>📢 Groupe Familial (Général)</h3>
           )}
 
-          {/* ZONE DROITE */}
+          {/* ZONE DROITE AVEC APPLI/BOUTONS */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ fontSize: '13px', fontWeight: 'bold', color: isDarkMode ? '#e0e0e0' : '#555', display: 'flex', alignItems: 'center' }}>
               👤 {currentUserName} {isAdmin && <VerifiedBadge />}
@@ -821,7 +827,7 @@ const Chat = () => {
 
           <input
             type="text"
-            placeholder={selectedUser ? `Message à ${selectedUser.prenom}...` : 'Écrire au groupe...'}
+            placeholder={selectedUser ? `Message à ${selectedUser.prenom || 'membre'}...` : 'Écrire au groupe...'}
             value={inputMessage}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
@@ -840,7 +846,7 @@ const Chat = () => {
         </form>
       </div>
 
-      {/* POP-UPS D'APPEL */}
+      {/* POP-UPS D'APPEL ENTRANT & EN COURS */}
       {incomingCall && (
         <div style={styles.callOverlay}>
           <div style={{ ...styles.callModal, backgroundColor: isDarkMode ? '#2d2d2d' : '#fff', color: isDarkMode ? '#fff' : '#333' }}>
