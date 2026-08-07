@@ -1,162 +1,311 @@
 import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import io from 'socket.io-client';
-
-const API_URL = "https://hadjidine-b.onrender.com";
-const socket = io(API_URL, { autoConnect: false });
 
 const Chat = () => {
-  // --- ÉTATS (STATES) ---
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [users, setUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null); // null = Discussion Groupe
-  const [currentUser, setCurrentUser] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // 💾 SAUVEGARDE & RESTAURATION DE L'UTILISATEUR SÉLECTIONNÉ
+  const [selectedUser, setSelectedUser] = useState(() => {
+    const savedUser = localStorage.getItem('chat_selected_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
   const [loading, setLoading] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
 
-  // Fonctionnalités avancées
-  const [replyTo, setReplyTo] = useState(null);
-  const [activeMenuId, setActiveMenuId] = useState(null);
-  const [activeReactionModalId, setActiveReactionModalId] = useState(null);
+  // Thème (Clair / Sombre / Auto)
+  const [theme, setTheme] = useState('light');
+
+  // Emojis & Réactions
   const [showStickers, setShowStickers] = useState(false);
-  const [typingUsers, setTypingUsers] = useState({});
+  const stickers = ['👍', '❤️', '😂', '🔥', '🎉', '🙏', '👏', '🤝', '⚡', '💡', '😎', '👌'];
+  const reactionsList = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
-  // Vocaux & Médias
+  // Appels & Média
+  const [activeCall, setActiveCall] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const handledCallsRef = useRef(new Set());
+  const localStreamRef = useRef(null);
+
+  // Enregistrement Vocal
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
+
+  // Indicateurs & Menus
+  const [isTypingRemote, setIsTypingRemote] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [deletedMsgIds, setDeletedMsgIds] = useState([]);
+  const [unreadUsers, setUnreadUsers] = useState({});
+  const [openMenuId, setOpenMenuId] = useState(null);
+
+  // Stockage des réactions
+  const [reactionsMap, setReactionsMap] = useState({});
+  const [activeReactionDetailsMsgId, setActiveReactionDetailsMsgId] = useState(null);
+
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
-  // Appels Audio / Vidéo
-  const [incomingCall, setIncomingCall] = useState(null);
-  const [activeCall, setActiveCall] = useState(null);
+  const token = localStorage.getItem('jwtToken');
+  const currentUserEmail = localStorage.getItem('userEmail') || '';
+  const userRole = localStorage.getItem('userRole') || 'USER';
 
-  // --- EFFETS (USEEFFECT) ---
-  useEffect(() => {
-    // Récupérer l'utilisateur connecté depuis le LocalStorage
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setCurrentUser(parsedUser);
-      socket.connect();
-      socket.emit('join', parsedUser._id || parsedUser.id);
-    }
+  // Infos de l'utilisateur connecté
+  const currentUser = users.find((u) => u.email === currentUserEmail);
+  const currentUserName = currentUser ? `${currentUser.prenom} ${currentUser.nom}` : currentUserEmail;
 
-    fetchUsers();
-    fetchMessages();
+  // Vérification Administrateur
+  const isAdmin = userRole === 'ADMIN' || currentUserEmail.includes('hadjidine');
 
-    // Écouteurs WebSockets
-    socket.on('receive_message', (newMessage) => {
-      setMessages((prev) => [...prev, newMessage]);
-    });
+  // Avatars par défaut
+  const defaultAvatarMale = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%230288d1'/><circle cx='32' cy='23' r='12' fill='%23fff'/><path d='M12 52c0-11 9-20 20-20s20 9 20 20z' fill='%23fff'/></svg>";
+  const defaultAvatarFemale = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><circle cx='32' cy='32' r='32' fill='%23e91e63'/><circle cx='32' cy='23' r='12' fill='%23fff'/><path d='M12 52c0-11 9-20 20-20s20 9 20 20z' fill='%23fff'/></svg>";
 
-    socket.on('user_typing', ({ userId, isTyping }) => {
-      setTypingUsers((prev) => ({ ...prev, [userId]: isTyping }));
-    });
-
-    socket.on('incoming_call', (data) => {
-      setIncomingCall(data);
-    });
-
-    socket.on('call_answered', (data) => {
-      setActiveCall((prev) => prev ? { ...prev, status: 'connected' } : null);
-    });
-
-    socket.on('call_ended', () => {
-      setActiveCall(null);
-      setIncomingCall(null);
-    });
-
-    return () => {
-      socket.off('receive_message');
-      socket.off('user_typing');
-      socket.off('incoming_call');
-      socket.off('call_answered');
-      socket.off('call_ended');
-      socket.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // --- REQUÊTES API ---
-  const fetchUsers = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/users`);
-      setUsers(res.data);
-    } catch (err) {
-      console.error("Erreur de chargement des utilisateurs:", err);
-    }
+  const toggleTheme = () => {
+    if (theme === 'light') setTheme('dark');
+    else if (theme === 'dark') setTheme('auto');
+    else setTheme('light');
   };
 
+  const isDarkMode =
+    theme === 'dark' ||
+    (theme === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  const formatLastSeen = (lastActiveDate) => {
+    if (!lastActiveDate) return 'Hors ligne';
+    const now = new Date();
+    const lastSeen = new Date(lastActiveDate);
+    const diffInSeconds = Math.floor((now - lastSeen) / 1000);
+
+    if (diffInSeconds < 120) return '● En ligne';
+    if (diffInSeconds < 3600) return `En ligne il y a ${Math.floor(diffInSeconds / 60)} min`;
+    if (diffInSeconds < 86400) return `En ligne il y a ${Math.floor(diffInSeconds / 3600)} h`;
+    return `En ligne il y a ${Math.floor(diffInSeconds / 86400)} j`;
+  };
+
+  const getUserDisplayName = (email) => {
+    if (email === currentUserEmail) return 'Moi';
+    const foundUser = users.find((u) => u.email === email);
+    return foundUser ? `${foundUser.prenom} ${foundUser.nom}` : email;
+  };
+
+  const isUserAdmin = (email) => {
+    if (email === currentUserEmail && isAdmin) return true;
+    const foundUser = users.find((u) => u.email === email);
+    return foundUser ? (foundUser.role === 'ADMIN' || foundUser.email?.includes('hadjidine')) : false;
+  };
+
+  const isUserOnline = (user) => {
+    if (!user) return false;
+    if (user.active === true) {
+      if (user.lastActive) {
+        const diff = (new Date() - new Date(user.lastActive)) / 1000;
+        return diff < 120;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // Badge Administrateur
+  const VerifiedBadge = () => (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="#1DA1F2" style={{ marginLeft: '4px', verticalAlign: 'middle', display: 'inline-block' }}>
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#FFF"/>
+    </svg>
+  );
+
+  // 1. Charger la liste des utilisateurs
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch('https://hadjidine-b.onrender.com', { headers });
+        if (response.ok) {
+          const data = await response.json();
+          const filtered = data.filter((u) => u.email !== currentUserEmail);
+          setUsers(filtered);
+
+          // Si l'utilisateur sélectionné était stocké, met à jour ses infos fraîches
+          if (selectedUser) {
+            const updatedSelected = filtered.find((u) => u.email === selectedUser.email);
+            if (updatedSelected) setSelectedUser(updatedSelected);
+          }
+        }
+      } catch (err) {
+        console.error('Erreur chargement utilisateurs:', err);
+      }
+    };
+    fetchUsers();
+    const interval = setInterval(fetchUsers, 5000);
+    return () => clearInterval(interval);
+  }, [token, currentUserEmail]);
+
+  // 2. Fetch Messages & Synchronisation des réactions
   const fetchMessages = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/messages`);
-      setMessages(res.data);
+      const receiver = selectedUser ? selectedUser.email : 'GENERAL';
+      const sender = currentUserEmail || '';
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const response = await fetch(
+        `https://hadjidine-b.onrender.com/api/messages?sender=${encodeURIComponent(sender)}&receiver=${encodeURIComponent(receiver)}`,
+        { headers }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data);
+
+        let isOtherTyping = false;
+
+        data.forEach((msg) => {
+          const content = msg.content || '';
+          const msgKey = `${msg.id}_${content}`;
+
+          if (content.startsWith('[REACTION:')) {
+            const parts = content.split(':');
+            if (parts.length >= 3) {
+              const emoji = parts[1];
+              const targetMsgId = parts[2].replace(']', '');
+              setReactionsMap((prev) => ({
+                ...prev,
+                [targetMsgId]: {
+                  ...(prev[targetMsgId] || {}),
+                  [msg.sender]: emoji,
+                },
+              }));
+            }
+          }
+
+          if (msg.sender !== currentUserEmail && msg.receiver === currentUserEmail) {
+            if (!selectedUser || selectedUser.email !== msg.sender) {
+              setUnreadUsers((prev) => ({ ...prev, [msg.sender]: true }));
+            }
+          }
+
+          if ((msg.receiver === currentUserEmail || msg.receiver === 'GENERAL') && !handledCallsRef.current.has(msgKey)) {
+            if (content.startsWith('[CALL_REQ_AUDIO]') && !activeCall && !incomingCall) {
+              setIncomingCall({ caller: msg.sender, type: 'audio' });
+              handledCallsRef.current.add(msgKey);
+            } else if (content.startsWith('[CALL_REQ_VIDEO]') && !activeCall && !incomingCall) {
+              setIncomingCall({ caller: msg.sender, type: 'video' });
+              handledCallsRef.current.add(msgKey);
+            } else if (content === '[CALL_ACCEPT]' && activeCall?.status === 'calling') {
+              setActiveCall((prev) => ({ ...prev, status: 'in-call' }));
+              handledCallsRef.current.add(msgKey);
+            } else if (content === '[CALL_REJECT]' || content === '[CALL_END]') {
+              closeCallMedia();
+              setActiveCall(null);
+              setIncomingCall(null);
+              handledCallsRef.current.add(msgKey);
+            }
+          }
+
+          if (
+            msg.sender !== currentUserEmail &&
+            (selectedUser ? msg.sender === selectedUser.email : true)
+          ) {
+            if (content === '[TYPING]') isOtherTyping = true;
+            if (content === '[STOP_TYPING]') isOtherTyping = false;
+          }
+        });
+
+        setIsTypingRemote(isOtherTyping);
+      }
     } catch (err) {
-      console.error("Erreur de chargement des messages:", err);
+      console.error('Erreur chargement messages:', err);
     }
   };
 
-  // --- GESTION DES MESSAGES & ENVOI ---
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!inputMessage.trim()) return;
+  useEffect(() => {
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 1500);
+    return () => clearInterval(interval);
+  }, [selectedUser, activeCall, incomingCall]);
 
-    setLoading(true);
-    const messageData = {
-      sender: currentUser?._id || currentUser?.id,
-      recipient: selectedUser ? selectedUser._id : null,
-      text: inputMessage,
-      replyTo: replyTo ? replyTo._id : null,
-      timestamp: new Date().toISOString(),
+  // Défilement automatique vers le bas + défilement après rechargement
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [selectedUser, messages.length]);
+
+  // 💾 FONCTION POUR SELECTIONNER ET SAUVEGARDER L'UTILISATEUR SÉLECTIONNÉ
+  const handleSelectUser = (user) => {
+    setSelectedUser(user);
+    if (user) {
+      localStorage.setItem('chat_selected_user', JSON.stringify(user));
+      setUnreadUsers((prev) => ({ ...prev, [user.email]: false }));
+    } else {
+      localStorage.removeItem('chat_selected_user'); // Groupe Général
+    }
+  };
+
+  const sendPayloadToBackend = async (contentPayload, targetReceiver = null) => {
+    if (!currentUserEmail) return;
+
+    let finalContent = contentPayload;
+    if (replyingTo && !contentPayload.startsWith('[')) {
+      finalContent = `[REPLY:${getUserDisplayName(replyingTo.sender)}:${replyingTo.content}] ${contentPayload}`;
+    }
+
+    const payload = {
+      sender: currentUserEmail,
+      receiver: targetReceiver || (selectedUser ? selectedUser.email : 'GENERAL'),
+      content: finalContent,
     };
 
     try {
-      const res = await axios.post(`${API_URL}/api/messages`, messageData);
-      socket.emit('send_message', res.data);
-      setMessages((prev) => [...prev, res.data]);
-      setInputMessage('');
-      setReplyTo(null);
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      await fetch('https://hadjidine-b.onrender.com/api/messages', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (!contentPayload.startsWith('[')) {
+        setReplyingTo(null);
+      }
+      await fetchMessages();
     } catch (err) {
-      console.error("Erreur d'envoi du message:", err);
-    } finally {
-      setLoading(false);
+      console.error('Erreur d\'envoi:', err);
     }
   };
 
-  // --- GESTION DES FICHIERS & VOCAUX ---
-  const handleFileUpload = async (e) => {
+  const handleInputFocus = () => sendPayloadToBackend('[TYPING]');
+  const handleInputBlur = () => sendPayloadToBackend('[STOP_TYPING]');
+  const handleInputChange = (e) => setInputMessage(e.target.value);
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!inputMessage.trim() || loading) return;
+    setLoading(true);
+    await sendPayloadToBackend(inputMessage);
+    await sendPayloadToBackend('[STOP_TYPING]');
+    setInputMessage('');
+    setShowStickers(false);
+    setLoading(false);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append('file', file);
+    const isVideo = file.type.startsWith('video/');
+    const reader = new FileReader();
 
-    try {
-      setLoading(true);
-      const res = await axios.post(`${API_URL}/api/upload`, formData);
-      const messageData = {
-        sender: currentUser?._id || currentUser?.id,
-        recipient: selectedUser ? selectedUser._id : null,
-        mediaUrl: res.data.url,
-        mediaType: file.type.startsWith('image/') ? 'image' : 'video',
-      };
-      const msgRes = await axios.post(`${API_URL}/api/messages`, messageData);
-      socket.emit('send_message', msgRes.data);
-      setMessages((prev) => [...prev, msgRes.data]);
-    } catch (err) {
-      console.error("Erreur d'upload du fichier:", err);
-    } finally {
-      setLoading(false);
-    }
+    reader.onload = async () => {
+      const tag = isVideo ? '[MEDIA_VID]' : '[MEDIA_IMG]';
+      await sendPayloadToBackend(`${tag}${reader.result}`);
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    reader.readAsDataURL(file);
   };
 
   const startRecording = async () => {
@@ -165,29 +314,16 @@ const Chat = () => {
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
 
-      mediaRecorderRef.current.ondataavailable = (e) => {
-        audioChunksRef.current.push(e.data);
-      };
-
+      mediaRecorderRef.current.ondataavailable = (event) => audioChunksRef.current.push(event.data);
       mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'voiceMessage.mp3');
-
-        try {
-          const res = await axios.post(`${API_URL}/api/upload`, formData);
-          const messageData = {
-            sender: currentUser?._id || currentUser?.id,
-            recipient: selectedUser ? selectedUser._id : null,
-            mediaUrl: res.data.url,
-            mediaType: 'audio',
-          };
-          const msgRes = await axios.post(`${API_URL}/api/messages`, messageData);
-          socket.emit('send_message', msgRes.data);
-          setMessages((prev) => [...prev, msgRes.data]);
-        } catch (err) {
-          console.error("Erreur d'envoi du vocal:", err);
-        }
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          await sendPayloadToBackend(`[MEDIA_AUDIO]${reader.result}`);
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        };
+        reader.readAsDataURL(audioBlob);
+        stream.getTracks().forEach((track) => track.stop());
       };
 
       mediaRecorderRef.current.start();
@@ -195,93 +331,128 @@ const Chat = () => {
       setRecordingTime(0);
       timerRef.current = setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
     } catch (err) {
-      console.error("Accès micro refusé:", err);
+      alert('Aucun microphone détecté.');
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current) {
+    if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       clearInterval(timerRef.current);
     }
   };
 
-  // --- INDICATEUR DE SAISIE (TYPING) ---
-  const handleInputChange = (e) => {
-    setInputMessage(e.target.value);
-  };
-
-  const handleInputFocus = () => {
-    socket.emit('typing', { targetId: selectedUser?._id, isTyping: true });
-  };
-
-  const handleInputBlur = () => {
-    socket.emit('typing', { targetId: selectedUser?._id, isTyping: false });
-  };
-
-  // --- REACTION ET MENU D'ACTION ---
-  const handleAddReaction = async (messageId, emoji) => {
+  const checkMediaDevices = async (type) => {
     try {
-      const res = await axios.post(`${API_URL}/api/messages/${messageId}/react`, { emoji, userId: currentUser._id });
-      setMessages((prev) => prev.map((msg) => (msg._id === messageId ? res.data : msg)));
-      setActiveMenuId(null);
+      const constraints = { audio: true, video: type === 'video' };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      localStreamRef.current = stream;
+      return true;
     } catch (err) {
-      console.error("Erreur d'ajout de réaction:", err);
+      alert(`Impossible d'initier l'appel : Matériel non détecté.`);
+      return false;
     }
   };
 
-  // --- APPELS AUDIO / VIDÉO ---
-  const startCall = (type) => {
+  const closeCallMedia = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+  };
+
+  const startCall = async (type) => {
     if (!selectedUser) return;
-    setActiveCall({ target: selectedUser, type, status: 'calling' });
-    socket.emit('call_user', { targetId: selectedUser._id, caller: currentUser, type });
+    const hasHardware = await checkMediaDevices(type);
+    if (!hasHardware) return;
+
+    const tag = type === 'video' ? '[CALL_REQ_VIDEO]' : '[CALL_REQ_AUDIO]';
+    setActiveCall({ type, status: 'calling', target: selectedUser.email });
+    await sendPayloadToBackend(tag, selectedUser.email);
   };
 
-  const answerCall = () => {
-    setActiveCall({ target: incomingCall.caller, type: incomingCall.type, status: 'connected' });
-    socket.emit('answer_call', { targetId: incomingCall.caller._id });
+  const answerCall = async () => {
+    if (!incomingCall) return;
+    const hasHardware = await checkMediaDevices(incomingCall.type);
+    if (!hasHardware) {
+      rejectOrCancelCall();
+      return;
+    }
+
+    setActiveCall({ type: incomingCall.type, status: 'in-call', target: incomingCall.caller });
+    await sendPayloadToBackend('[CALL_ACCEPT]', incomingCall.caller);
     setIncomingCall(null);
   };
 
-  const rejectOrCancelCall = () => {
-    const targetId = activeCall ? activeCall.target?._id : incomingCall?.caller?._id;
-    socket.emit('end_call', { targetId });
-    setActiveCall(null);
-    setIncomingCall(null);
+  const rejectOrCancelCall = async () => {
+    closeCallMedia();
+    if (incomingCall) {
+      await sendPayloadToBackend('[CALL_MISSED]', incomingCall.caller);
+      await sendPayloadToBackend('[CALL_REJECT]', incomingCall.caller);
+      setIncomingCall(null);
+    } else if (activeCall) {
+      if (activeCall.status === 'calling') {
+        await sendPayloadToBackend('[CALL_MISSED]', activeCall.target);
+      }
+      await sendPayloadToBackend('[CALL_END]', activeCall.target);
+      setActiveCall(null);
+    }
   };
 
-  const getUserDisplayName = (user) => {
-    if (!user) return "Utilisateur";
-    return user.prenom ? `${user.prenom} ${user.nom || ''}` : user.username || "Utilisateur";
+  const handleAddReaction = async (msgId, emoji) => {
+    setReactionsMap((prev) => ({
+      ...prev,
+      [msgId]: {
+        ...(prev[msgId] || {}),
+        [currentUserEmail]: emoji,
+      },
+    }));
+    setOpenMenuId(null);
+    await sendPayloadToBackend(`[REACTION:${emoji}:${msgId}]`);
+  };
+
+  const handleReplyMessage = (msg) => {
+    setReplyingTo(msg);
+    setOpenMenuId(null);
+  };
+
+  const handleDeleteMessage = (msgId) => {
+    setDeletedMsgIds((prev) => [...prev, msgId]);
+    setOpenMenuId(null);
   };
 
   const filteredUsers = users.filter((u) =>
-    getUserDisplayName(u).toLowerCase().includes(searchTerm.toLowerCase())
+    `${u.nom || ''} ${u.prenom || ''} ${u.email || ''}`
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
   );
 
-  const filteredMessages = messages.filter((m) => {
-    if (!selectedUser) return !m.recipient; // Groupe
-    return (
-      (m.sender === currentUser?._id && m.recipient === selectedUser._id) ||
-      (m.sender === selectedUser._id && m.recipient === currentUser?._id)
-    );
-  });
-
   return (
-    <div style={{ ...styles.chatLayout, backgroundColor: isDarkMode ? '#1a1a1a' : '#f5f7fb', color: isDarkMode ? '#fff' : '#333' }}>
-
+    <div
+      style={{
+        ...styles.chatLayout,
+        backgroundColor: isDarkMode ? '#1e1e1e' : '#fff',
+        color: isDarkMode ? '#e0e0e0' : '#333',
+      }}
+    >
       {/* SIDEBAR */}
-      <div style={{ ...styles.sidebar, borderColor: isDarkMode ? '#333' : '#e0e0e0', backgroundColor: isDarkMode ? '#242424' : '#fff' }}>
+      <div
+        style={{
+          ...styles.sidebar,
+          backgroundColor: isDarkMode ? '#252526' : '#fafafa',
+          borderRightColor: isDarkMode ? '#333' : '#eee',
+        }}
+      >
         <div style={{ ...styles.searchBox, borderBottomColor: isDarkMode ? '#333' : '#eee' }}>
           <input
             type="text"
-            placeholder="Rechercher un membre..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="🔍 Rechercher un membre..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               ...styles.searchInput,
-              backgroundColor: isDarkMode ? '#333' : '#f0f2f5',
+              backgroundColor: isDarkMode ? '#333' : '#fff',
               color: isDarkMode ? '#fff' : '#333',
               borderColor: isDarkMode ? '#444' : '#ccc',
             }}
@@ -289,176 +460,339 @@ const Chat = () => {
         </div>
 
         <div style={styles.userList}>
-          {/* Option Discussion Générale / Groupe */}
           <div
-            onClick={() => setSelectedUser(null)}
+            onClick={() => handleSelectUser(null)}
             style={{
               ...styles.userCard,
-              backgroundColor: selectedUser === null ? (isDarkMode ? '#333' : '#e3f2fd') : 'transparent',
+              backgroundColor:
+                selectedUser === null
+                  ? isDarkMode
+                    ? '#0d47a1'
+                    : '#e3f2fd'
+                  : 'transparent',
             }}
           >
-            <div style={styles.avatarGeneral}>💬</div>
+            <div style={styles.avatarGeneral}>📢</div>
             <div>
-              <strong>Discussion Générale</strong>
-              <div style={{ ...styles.subText, color: isDarkMode ? '#aaa' : '#666' }}>Groupe principal</div>
+              <strong>Groupe Familial</strong>
+              <div style={{ ...styles.subText, color: isDarkMode ? '#aaa' : '#888' }}>Chat Général</div>
             </div>
           </div>
 
-          {/* Liste des Utilisateurs */}
-          {filteredUsers.map((user) => (
-            <div
-              key={user._id || user.id}
-              onClick={() => setSelectedUser(user)}
-              style={{
-                ...styles.userCard,
-                backgroundColor: selectedUser?._id === user._id ? (isDarkMode ? '#333' : '#e3f2fd') : 'transparent',
-              }}
-            >
-              <img
-                src={user.avatar || 'https://via.placeholder.com/40'}
-                alt="avatar"
-                style={styles.avatar}
-              />
-              <div>
-                <strong>{getUserDisplayName(user)}</strong>
-                <div style={{ ...styles.subText, color: isDarkMode ? '#aaa' : '#666' }}>
-                  {typingUsers[user._id] ? 'Écrit...' : 'En ligne'}
+          <hr style={{ border: 'none', borderTop: `1px solid ${isDarkMode ? '#333' : '#eee'}`, margin: '8px 0' }} />
+
+          {filteredUsers.map((user) => {
+            const isUnread = unreadUsers[user.email];
+            const hasAdminBadge = isUserAdmin(user.email);
+            const fallbackAvatar = user.sexe === 'F' ? defaultAvatarFemale : defaultAvatarMale;
+            const online = isUserOnline(user);
+
+            return (
+              <div
+                key={user.id || user.email}
+                onClick={() => handleSelectUser(user)}
+                style={{
+                  ...styles.userCard,
+                  backgroundColor:
+                    selectedUser?.email === user.email
+                      ? isDarkMode
+                        ? '#0d47a1'
+                        : '#e3f2fd'
+                      : 'transparent',
+                }}
+              >
+                <div style={{ position: 'relative' }}>
+                  <img
+                    src={user.avatarUrl || fallbackAvatar}
+                    alt="Avatar"
+                    style={styles.avatar}
+                  />
+                  {isUnread && <span style={styles.unreadBadge} />}
+                </div>
+                <div>
+                  <strong style={{ fontWeight: isUnread ? '900' : 'normal', color: isDarkMode ? '#fff' : '#333' }}>
+                    {user.prenom} {user.nom} {hasAdminBadge && <VerifiedBadge />}
+                  </strong>
+                  <div style={{ fontSize: '12px', color: online ? '#4caf50' : isDarkMode ? '#aaa' : '#888' }}>
+                    {online ? '● En ligne' : formatLastSeen(user.lastActive)}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {/* CHAT AREA */}
+      {/* ZONE DE CHAT */}
       <div style={styles.chatArea}>
         {/* HEADER */}
-        <div style={{ ...styles.chatHeader, borderBottomColor: isDarkMode ? '#333' : '#eee', backgroundColor: isDarkMode ? '#242424' : '#fff' }}>
-          <div>
-            <h3>{selectedUser ? getUserDisplayName(selectedUser) : 'Discussion Générale'}</h3>
-            {selectedUser && typingUsers[selectedUser._id] && (
-              <span style={styles.typingIndicator}>est en train d'écrire...</span>
+        <div
+          style={{
+            ...styles.chatHeader,
+            backgroundColor: isDarkMode ? '#2d2d2d' : '#f9f9f9',
+            borderBottomColor: isDarkMode ? '#333' : '#eee',
+          }}
+        >
+          {selectedUser ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <img
+                src={selectedUser.avatarUrl || (selectedUser.sexe === 'F' ? defaultAvatarFemale : defaultAvatarMale)}
+                alt="Avatar"
+                style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
+              />
+              <div>
+                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', color: isDarkMode ? '#fff' : '#333' }}>
+                  {selectedUser.prenom} {selectedUser.nom}
+                  {isUserAdmin(selectedUser.email) && <VerifiedBadge />}
+                </h3>
+                <small style={{ color: isUserOnline(selectedUser) ? '#4caf50' : isDarkMode ? '#aaa' : '#888' }}>
+                  {isUserOnline(selectedUser) ? '● En ligne' : formatLastSeen(selectedUser.lastActive)}
+                </small>
+              </div>
+            </div>
+          ) : (
+            <h3 style={{ margin: 0, color: isDarkMode ? '#fff' : '#333' }}>📢 Groupe Familial (Général)</h3>
+          )}
+
+          {/* ZONE DROITE */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 'bold', color: isDarkMode ? '#e0e0e0' : '#555', display: 'flex', alignItems: 'center' }}>
+              👤 {currentUserName} {isAdmin && <VerifiedBadge />}
+            </div>
+
+            <button
+              onClick={toggleTheme}
+              style={{
+                ...styles.btnCall,
+                backgroundColor: isDarkMode ? '#444' : '#eceff1',
+                color: isDarkMode ? '#fff' : '#333',
+              }}
+              title={`Mode actuel : ${theme.toUpperCase()}`}
+            >
+              {theme === 'light' ? '☀️' : theme === 'dark' ? '🌙' : '🔄'}
+            </button>
+
+            {selectedUser && (
+              <div style={styles.callButtons}>
+                <button onClick={() => startCall('audio')} style={styles.btnCall} title="Appel Audio">
+                  📞
+                </button>
+                <button onClick={() => startCall('video')} style={{ ...styles.btnCall, backgroundColor: '#0288d1' }} title="Appel Vidéo">
+                  📹
+                </button>
+              </div>
             )}
           </div>
-          {selectedUser && (
-            <div style={styles.callButtons}>
-              <button onClick={() => startCall('audio')} style={styles.btnCall} title="Appel Audio">📞</button>
-              <button onClick={() => startCall('video')} style={styles.btnCall} title="Appel Vidéo">📹</button>
-            </div>
-          )}
         </div>
 
-        {/* BOÎTE DE MESSAGES */}
-        <div style={styles.messagesBox}>
-          {filteredMessages.map((msg) => {
-            const isMe = (msg.sender?._id || msg.sender) === (currentUser?._id || currentUser?.id);
+        {/* MESSAGES */}
+        <div style={styles.messagesBox} ref={chatContainerRef}>
+          {messages.map((msg, index) => {
+            const isMe = msg.sender === currentUserEmail;
+            let content = msg.content || '';
+            const msgId = msg.id || index;
+
+            const isDeleted = deletedMsgIds.includes(msgId);
+            if (isDeleted && !isAdmin) return null;
+
+            const isSignal = content.startsWith('[CALL_REQ') || content.startsWith('[CALL_ACCEPT') || content.startsWith('[CALL_REJECT') || content.startsWith('[CALL_END') || content.startsWith('[REACTION:') || content === '[TYPING]' || content === '[STOP_TYPING]';
+            if (isSignal) return null;
+
+            let replyText = null;
+            if (content.startsWith('[REPLY:')) {
+              const replyEndIndex = content.indexOf(']');
+              replyText = content.substring(7, replyEndIndex);
+              content = content.substring(replyEndIndex + 1);
+            }
+
+            const isImg = content.startsWith('[MEDIA_IMG]');
+            const isVid = content.startsWith('[MEDIA_VID]');
+            const isAudio = content.startsWith('[MEDIA_AUDIO]');
+            const isMissedCall = content === '[CALL_MISSED]';
+            const rawMediaUrl = (isImg || isVid || isAudio) ? content.replace(/^\[MEDIA_IMG\]|^\[MEDIA_VID\]|^\[MEDIA_AUDIO\]/, '') : null;
+
+            const msgReactions = reactionsMap[msgId] || {};
+            const reactionUsers = Object.keys(msgReactions);
+            const totalReactionsCount = reactionUsers.length;
+            const uniqueEmojis = Array.from(new Set(Object.values(msgReactions)));
+
+            const senderIsAdmin = isUserAdmin(msg.sender);
+
             return (
               <div
-                key={msg._id}
+                key={msgId}
                 style={{
                   ...styles.messageWrapper,
-                  justifyContent: isMe ? 'flex-end' : 'flex-start',
+                  flexDirection: isMe ? 'row-reverse' : 'row',
                 }}
               >
-                <div
-                  style={{
-                    ...styles.messageBubble,
-                    backgroundColor: isMe ? '#0288d1' : (isDarkMode ? '#333' : '#fff'),
-                    color: isMe ? '#fff' : (isDarkMode ? '#fff' : '#333'),
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-                  }}
-                >
-                  {/* Aperçu de réponse */}
-                  {msg.replyTo && (
-                    <div style={{ ...styles.replyBoxPreview, backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)' }}>
-                      <small>Réponse : {msg.replyTo.text || 'Média'}</small>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start', maxWidth: '65%', position: 'relative' }}>
+                  <div
+                    style={{
+                      ...styles.messageBubble,
+                      backgroundColor: isDeleted && isAdmin
+                        ? (isDarkMode ? '#5c1d1d' : '#ffebee')
+                        : isMissedCall
+                        ? (isDarkMode ? '#5c3c1d' : '#fff3e0')
+                        : isMe
+                        ? '#0288d1'
+                        : (isDarkMode ? '#333' : '#e0e0e0'),
+                      color: isDeleted && isAdmin
+                        ? '#ef5350'
+                        : isMe
+                        ? '#fff'
+                        : (isDarkMode ? '#fff' : '#333'),
+                      border: isDeleted && isAdmin ? '2px solid #ef5350' : 'none',
+                    }}
+                  >
+                    {isDeleted && isAdmin && (
+                      <div style={{ fontSize: '10px', color: '#ef5350', fontWeight: 'bold', marginBottom: '4px' }}>
+                        🚫 Message supprimé (Admin)
+                      </div>
+                    )}
+
+                    {replyText && (
+                      <div
+                        style={{
+                          ...styles.replyBoxPreview,
+                          backgroundColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                        }}
+                      >
+                        <small style={{ fontWeight: 'bold' }}>Réponse à :</small>
+                        <div style={{ fontSize: '11px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          {replyText}
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: '11px', opacity: 0.85, marginBottom: '2px', fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                      {getUserDisplayName(msg.sender)} {senderIsAdmin && <VerifiedBadge />}
+                    </div>
+
+                    {isMissedCall ? (
+                      <div style={{ fontWeight: 'bold', color: '#ef5350' }}>📞 Appel manqué</div>
+                    ) : isImg ? (
+                      <img src={rawMediaUrl} alt="Photo" style={styles.mediaContent} />
+                    ) : isVid ? (
+                      <video src={rawMediaUrl} controls style={styles.mediaContent} />
+                    ) : isAudio ? (
+                      <audio src={rawMediaUrl} controls style={{ width: '200px', marginTop: '5px' }} />
+                    ) : (
+                      <div>{content}</div>
+                    )}
+
+                    <small style={styles.msgTime}>
+                      {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                    </small>
+
+                    {totalReactionsCount > 0 && (
+                      <div
+                        onClick={() => setActiveReactionDetailsMsgId(activeReactionDetailsMsgId === msgId ? null : msgId)}
+                        style={{
+                          ...styles.reactionBadge,
+                          backgroundColor: isDarkMode ? '#444' : '#fff',
+                          color: isDarkMode ? '#fff' : '#333',
+                          left: isMe ? '-10px' : 'auto',
+                          right: isMe ? 'auto' : '-10px',
+                        }}
+                        title="Cliquer pour voir les réactions"
+                      >
+                        {uniqueEmojis.join('')} <span style={{ fontSize: '11px', marginLeft: '2px', fontWeight: 'bold' }}>{totalReactionsCount}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {activeReactionDetailsMsgId === msgId && (
+                    <div
+                      style={{
+                        ...styles.reactionDetailsModal,
+                        backgroundColor: isDarkMode ? '#333' : '#fff',
+                        color: isDarkMode ? '#fff' : '#333',
+                        left: isMe ? '0' : 'auto',
+                        right: isMe ? 'auto' : '0',
+                      }}
+                    >
+                      <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '12px', borderBottom: '1px solid #ccc', pb: '4px' }}>
+                        Réactions ({totalReactionsCount})
+                      </div>
+                      {reactionUsers.map((userEmail) => (
+                        <div key={userEmail} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', fontSize: '12px', margin: '4px 0' }}>
+                          <span>{getUserDisplayName(userEmail)}</span>
+                          <span style={{ fontSize: '14px' }}>{msgReactions[userEmail]}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
+                </div>
 
-                  {/* Texte du message */}
-                  {msg.text && <p style={{ margin: 0 }}>{msg.text}</p>}
-
-                  {/* Médias */}
-                  {msg.mediaUrl && msg.mediaType === 'image' && (
-                    <img src={msg.mediaUrl} alt="media" style={styles.mediaContent} />
-                  )}
-                  {msg.mediaUrl && msg.mediaType === 'video' && (
-                    <video src={msg.mediaUrl} controls style={styles.mediaContent} />
-                  )}
-                  {msg.mediaUrl && msg.mediaType === 'audio' && (
-                    <audio src={msg.mediaUrl} controls style={{ marginTop: '5px', width: '200px' }} />
-                  )}
-
-                  <span style={{ ...styles.msgTime, color: isMe ? '#e0e0e0' : '#888' }}>
-                    {new Date(msg.timestamp || msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-
-                  {/* Bouton trois points */}
+                <div style={{ position: 'relative', margin: '0 5px' }}>
                   <button
-                    onClick={() => setActiveMenuId(activeMenuId === msg._id ? null : msg._id)}
-                    style={{ ...styles.btnThreeDots, color: isMe ? '#fff' : '#666' }}
+                    onClick={() => setOpenMenuId(openMenuId === msgId ? null : msgId)}
+                    style={{ ...styles.btnThreeDots, color: isDarkMode ? '#aaa' : '#888' }}
                   >
                     ⋮
                   </button>
 
-                  {/* Menu contextuel (Réactions / Répondre) */}
-                  {activeMenuId === msg._id && (
-                    <div style={{ ...styles.actionMenuPop, backgroundColor: isDarkMode ? '#444' : '#fff', color: isDarkMode ? '#fff' : '#333' }}>
+                  {openMenuId === msgId && (
+                    <div
+                      style={{
+                        ...styles.actionMenuPop,
+                        backgroundColor: isDarkMode ? '#333' : '#fff',
+                        color: isDarkMode ? '#fff' : '#333',
+                        right: isMe ? '0' : 'auto',
+                        left: isMe ? 'auto' : '0',
+                      }}
+                    >
                       <div style={styles.emojiRow}>
-                        {['👍', '❤️', '😂', '😮', '😢'].map((emoji) => (
-                          <span
-                            key={emoji}
-                            onClick={() => handleAddReaction(msg._id, emoji)}
-                            style={styles.reactionEmoji}
-                          >
+                        {reactionsList.map((emoji) => (
+                          <span key={emoji} onClick={() => handleAddReaction(msgId, emoji)} style={styles.reactionEmoji}>
                             {emoji}
                           </span>
                         ))}
                       </div>
-                      <div
-                        onClick={() => { setReplyTo(msg); setActiveMenuId(null); }}
-                        style={styles.menuItem}
-                      >
+                      <hr style={{ margin: '4px 0', border: 'none', borderTop: `1px solid ${isDarkMode ? '#444' : '#eee'}` }} />
+                      <div onClick={() => handleReplyMessage(msg)} style={styles.menuItem}>
                         ↩️ Répondre
                       </div>
-                    </div>
-                  )}
-
-                  {/* Badges de réactions */}
-                  {msg.reactions && msg.reactions.length > 0 && (
-                    <div
-                      onClick={() => setActiveReactionModalId(activeReactionModalId === msg._id ? null : msg._id)}
-                      style={{ ...styles.reactionBadge, backgroundColor: isDarkMode ? '#444' : '#fff' }}
-                    >
-                      {msg.reactions.map((r, i) => <span key={i}>{r.emoji}</span>)}
+                      <div onClick={() => handleDeleteMessage(msgId)} style={{ ...styles.menuItem, color: '#ef5350' }}>
+                        🗑️ Supprimer
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
             );
           })}
+
+          {isTypingRemote && (
+            <div style={styles.typingIndicator}>
+              <span>●</span><span>●</span><span>●</span>
+              <small style={{ marginLeft: '6px', color: isDarkMode ? '#aaa' : '#666' }}>est en train d'écrire...</small>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
 
-        {/* BARRE DE STICKERS ET RÉPONSE */}
+        {/* EMOJIS / STICKERS */}
         {showStickers && (
-          <div style={{ ...styles.stickerBar, backgroundColor: isDarkMode ? '#242424' : '#fff', borderTopColor: isDarkMode ? '#333' : '#eee' }}>
-            {['🔥', '🎉', '💯', '👏', '🚀', '❤️', '😍', '✨'].map((sticker) => (
-              <span
-                key={sticker}
-                onClick={() => { setInputMessage((prev) => prev + sticker); setShowStickers(false); }}
-                style={{ fontSize: '24px', cursor: 'pointer' }}
-              >
-                {sticker}
+          <div style={{ ...styles.stickerBar, backgroundColor: isDarkMode ? '#252526' : '#fff', borderTopColor: isDarkMode ? '#333' : '#eee' }}>
+            {stickers.map((stk, i) => (
+              <span key={i} onClick={() => setInputMessage((prev) => prev + stk)} style={{ cursor: 'pointer', fontSize: '20px' }}>
+                {stk}
               </span>
             ))}
           </div>
         )}
 
-        {replyTo && (
-          <div style={{ ...styles.replyBar, backgroundColor: isDarkMode ? '#2d2d2d' : '#e3f2fd', borderTopColor: isDarkMode ? '#333' : '#eee' }}>
-            <span>Réponse à : <i>{replyTo.text || 'Fichier/Média'}</i></span>
-            <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>
+        {/* CITER LE MESSAGE */}
+        {replyingTo && (
+          <div style={{ ...styles.replyBar, backgroundColor: isDarkMode ? '#1a365d' : '#e3f2fd', borderTopColor: isDarkMode ? '#2b6cb0' : '#bbdefb' }}>
+            <div>
+              <small style={{ fontWeight: 'bold' }}>Réponse à {getUserDisplayName(replyingTo.sender)} :</small>
+              <div style={{ fontSize: '12px', color: isDarkMode ? '#ccc' : '#555' }}>{replyingTo.content}</div>
+            </div>
+            <button onClick={() => setReplyingTo(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold', color: isDarkMode ? '#fff' : '#000' }}>
               ❌
             </button>
           </div>
@@ -487,7 +821,7 @@ const Chat = () => {
 
           <input
             type="text"
-            placeholder={selectedUser ? `Message à ${getUserDisplayName(selectedUser)}...` : 'Écrire au groupe...'}
+            placeholder={selectedUser ? `Message à ${selectedUser.prenom}...` : 'Écrire au groupe...'}
             value={inputMessage}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
@@ -542,7 +876,6 @@ const Chat = () => {
   );
 };
 
-// --- TABLEAU DE STYLES COMPLETS ---
 const styles = {
   chatLayout: { display: 'flex', height: '85vh', maxWidth: '1100px', margin: '15px auto', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', overflow: 'hidden', fontFamily: 'Segoe UI, sans-serif' },
   sidebar: { width: '320px', borderRight: '1px solid', display: 'flex', flexDirection: 'column' },
