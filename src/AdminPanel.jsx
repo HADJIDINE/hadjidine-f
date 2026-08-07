@@ -88,7 +88,7 @@ const AdminPanel = () => {
     }
   };
 
-  // Mettre à jour le code familial
+  // Mettre à jour le code familial (Modifié et corrigé pour Render)
   const handleUpdateCode = async (e) => {
     e.preventDefault();
     setMessage('');
@@ -96,9 +96,13 @@ const AdminPanel = () => {
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin/family-code?code=${encodeURIComponent(newFamilyCode)}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        method: 'PUT', // Utilisation de PUT au lieu de POST
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
       });
+
       if (!response.ok) throw new Error('Mise à jour du code échouée');
       setMessage('Nouveau code familial enregistré avec succès !');
       setNewFamilyCode('');
