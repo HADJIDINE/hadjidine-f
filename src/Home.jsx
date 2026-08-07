@@ -1,8 +1,5 @@
 import React from 'react';
 
-// TA VRAIE PHOTO D'INGÉNIEUR / DIPLÔME EN BASE64 (S'AFFICHE À TOUS LES COUPS)
-const MY_PHOTO_BASE64 = `data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARERER4RHGQaG2RnURNRZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2P/wgARCAENAZADASIAAhEBAxEB/8QAGgABAAMBAQEAAAAAAAAAAAAAAAECBAMFBv/EABYBAQEBAAAAAAAAAAAAAAAAAAABAv/aAAw0I2sAEAAAH3AAAKCghEghEgiRCAkgmACJACJAgmEiACQCJAAAAAKAAAAAACJAkgkCJEEghIIkACCSJCJAAkgAAACgAAAAACiUSCSSCSAkiQgkAkgkCJCJAACJAAgCkgAAAAoAAAAAolAkgkgSJAkCJAIJIJBEgAACSACAEogACgkAAAAFAAAAACkgSJAACCSCQBEiSACSCSAQSQAAAASAAFJAAAAUAAABQSACARIAAEACCSJAACSCARIAASiAAAApKCSAKCRAACkSCSBIJAJAJAAkEACACARIAAAABKAAUkAAAASiAAkAkgkAkkkAkgAAACSQCRCSAAACgkAACkkAACSCSARIAJJJJAACJAAJAEEgkAAAAACkAAABKAAiSQkgkgkAkAAkEAEggAACSQSgACgkAAAACkkEEgkiRIkEEkkkACCSACCRIACJACUAACgAAACkggkgkACSSSSACCCQAQCASACQAASgAAUAAABSIJAEiACSSSSSAQCSACARIAACRIAAAAUAAAAUgCSBIAEkkkgkAARIAIAJAAIJJIAAAFAAAAFIkgCQAkkkkgEEgEgACARIAAAAAASgAAACkgSkgkgCSACQQACASARIAAAAAASQAAAUAAAAkiCSAJABIJAAAIAJAiQAAAAASQAAAUAAAAkASASABIAJAiQAEEggAAAAACUAACiUAACQgJIJJAAABAAAJEACRIAAAABKAAAACgkACQCSARIJJJAAAIAAJIIAAAEoAAAACkASQCQCASSSSSSSCRABAAIEEgACJAAACkAABQAJAEgkAAAkkgkEkgkgCSACCQAAAABKAAAFAAkASAAAAkkkgkgACAEiAAAABKAAAABQSAJAJAAAAiRJAAJABIABAAAACUAAACkgASCSAAAABIIAABBIAIAAAASgAAApIIABJAIAAACSQSACQACCACQAACUAACggAEAkgAAAAkkkEEgkkgAkEAAAAJRAAAUkCQASSAAAABJABBIJAAAAAAASgAFBIJAJABIAAAAJAJIIAAAAAAAASgAUkAEAACQAAAAgJAkAAAAAAAAACUACkACASAAAAACCRIAAAAAAAABKAFIAIBJAAAABJAJIJAAAAAAAAAEpAFIAIBJAAAABIJJAIAAAAAAAAAlAAgkAAkgAAAASACSCSQSAAAAAASgACQAASAASAAAEEggAAAAAAAASUACQACACAAAAJABIIAAAAAAAASgASACQCAAAAACASAQAABKAEgABKABIAJAIAAAAAAkAkggAAAAEpAFIAACQACAAAAABJABAAAAEogAUkAAkACAAAAAAJAJAIAABKABSAAAkAAACSAAAAJAAAAAEoACkAAkAAACSAAAAAABIIAAAASACiUAACQAAAAAAAASAQAABKAABKAAAJAACCSQAAAAAkgkEAAAAEpABSAJAJAkgAAAACSCSACSQQAAAAACUACkEEkgkgkgkAACSASACSACCQAAAAACUASiCSCSAAAAABIAAAAAIEEiAAAASgASiAABIAJAABIIAAAAACSAASQAAAUAABJAJIBIIAABBJAAAAJIAJBIAAFAABJAJABIAAJBAAAABIABBIAABQAAkgAkAEEAkgAEkkggkAkCSASACASAAUAABJAJAIEEkkEAEggAASiAQCQACCQACgACQCSCASQACQAAASBACQAASACUAACSAACQQAACSQAACCQAACQAACUABIJABBIAIJAABJAAAJAABAABKAABIIAJJAABIJAAAAJAACASgACUACQAQAACSQACQAAACQAACQAACgCQASACCQACSACCQCSQAASQAASgACQAQSQACSCCQAAACSCSAAQSAASUACiSQSASACACCSACSSQAAAJAABIABKAJIAIBJAAJAAAAJABIIAABIBJQIBJABBAAJBAAIABIAAAAJAABAABKACSACAAAAAAAkgkEAAAAJABAIABKABBIIIAJAAAABJIJAAAAAEEgkAAEpIAIBJAJJIAAIBIJJAABIAAIEEgAAElAkgEAEkAAAAAkkkkEEAkkEEgkkEAAEkAEkgAAAEogAAAAAAkggkAAkkgkgAAAkkAEg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`;
-
 const Home = ({ onGoToEspF }) => {
   const userInfo = {
     nom: 'AFFANE',
@@ -11,9 +8,10 @@ const Home = ({ onGoToEspF }) => {
     whatsappNumber: '261388795903',
     telephone: '+261 38 87 959 03',
     adresse: 'Sotema Tanambao, Mahajanga',
+    // Assure-toi de mettre ta photo dans le dossier "public/hadjidine.png"
+    photoUrl: '/hadjidine.png',
   };
 
-  // Liens vers tes réseaux sociaux
   const socialLinks = [
     {
       name: 'TikTok',
@@ -72,10 +70,9 @@ const Home = ({ onGoToEspF }) => {
       <div style={styles.overlay} />
 
       <div style={styles.container}>
-        {/* SECTION DU HAUT : ESPACE FAMILIAL & PROFIL */}
         <div style={styles.topGrid}>
 
-          {/* BLOC ESPACE FAMILIAL - AVEC LE BOUTON BLEU SE CONNECTER / S'INSCRIRE */}
+          {/* BLOC ESPACE FAMILIAL - SEUL BOUTON EN BAS */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <h1 style={styles.espTitle}>Espace Familial</h1>
@@ -83,36 +80,30 @@ const Home = ({ onGoToEspF }) => {
             </div>
 
             <button onClick={onGoToEspF} style={styles.btnPrimary}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-                <polyline points="10 17 15 12 10 7"></polyline>
-                <line x1="15" y1="12" x2="3" y2="12"></line>
-              </svg>
               Se connecter / S'inscrire
             </button>
           </div>
 
-          {/* BLOC PROFIL AVEC TA PHOTO D'INGÉNIEUR ENCADRÉE */}
+          {/* BLOC PROFIL AVEC PHOTO AU-DESSUS DU BOUTON VERTS */}
           <div style={styles.card}>
-            <div style={styles.profileHeader}>
-              <div style={styles.profileDetails}>
-                <p style={styles.infoRow}>
-                  Nom : <span style={styles.infoValue}>{userInfo.nom}</span>
-                </p>
-                <p style={styles.infoRow}>
-                  Prénom : <span style={styles.infoValue}>{userInfo.prenom}</span>
-                </p>
-                <p style={styles.titleBadge}>{userInfo.titre}</p>
-              </div>
+            <div style={styles.profileTextDetails}>
+              <p style={styles.infoRow}>Nom : <span style={styles.infoValue}>{userInfo.nom}</span></p>
+              <p style={styles.infoRow}>Prénom : <span style={styles.infoValue}>{userInfo.prenom}</span></p>
+              <p style={styles.titleBadge}>{userInfo.titre}</p>
+            </div>
 
-              {/* Cadre photo de diplôme/ingénieur */}
-              <div style={styles.photoBox}>
-                <img
-                  src={MY_PHOTO_BASE64}
-                  alt="Hadjidine Affane"
-                  style={styles.photoImage}
-                />
-              </div>
+            {/* LA PHOTO S'AFFICHE DÉSORMAIS AU-DESSUS DU BOUTON "VOIR MES COMPÉTENCES" */}
+            <div style={styles.photoContainer}>
+              <img
+                src={userInfo.photoUrl}
+                alt="Hadjidine Affane"
+                style={styles.photoImg}
+                onError={(e) => {
+                  // Alternative visuelle si l'image n'existe pas dans le dossier public
+                  e.target.onerror = null;
+                  e.target.src = 'https://via.placeholder.com/120?text=Photo+Hadjidine';
+                }}
+              />
             </div>
 
             <a
@@ -127,7 +118,7 @@ const Home = ({ onGoToEspF }) => {
 
         </div>
 
-        {/* SECTION DU BAS : ME CONTACTER */}
+        {/* SECTION ME CONTACTER */}
         <div style={styles.contactCard}>
           <div style={styles.contactHeader}>
             <h2 style={styles.contactTitle}>Me Contacter</h2>
@@ -136,7 +127,6 @@ const Home = ({ onGoToEspF }) => {
             </p>
           </div>
 
-          {/* RÉSEAUX SOCIAUX */}
           <div style={styles.socialGrid}>
             {socialLinks.map((item, index) => (
               <a
@@ -154,7 +144,6 @@ const Home = ({ onGoToEspF }) => {
             ))}
           </div>
 
-          {/* COORDONNÉES RÉELLES */}
           <div style={styles.directContactGrid}>
             <div style={styles.contactItem}>
               <div style={styles.contactIconCircle}>📞</div>
@@ -218,10 +207,11 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
+    alignItems: 'center',
     border: '1px solid rgba(255, 255, 255, 0.3)',
+    textAlign: 'center',
   },
   cardHeader: {
-    textAlign: 'center',
     margin: 'auto 0',
   },
   espTitle: {
@@ -229,7 +219,6 @@ const styles = {
     fontWeight: '800',
     color: '#0f172a',
     margin: 0,
-    letterSpacing: '-0.5px',
   },
   titleDivider: {
     width: '60px',
@@ -238,18 +227,12 @@ const styles = {
     margin: '15px auto 0',
     borderRadius: '2px',
   },
-  profileHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: '15px',
-    marginBottom: '25px',
-  },
-  profileDetails: {
-    flex: 1,
+  profileTextDetails: {
+    marginBottom: '15px',
+    width: '100%',
   },
   infoRow: {
-    margin: '6px 0',
+    margin: '4px 0',
     color: '#64748b',
     fontSize: '14px',
   },
@@ -260,29 +243,26 @@ const styles = {
   },
   titleBadge: {
     display: 'inline-block',
-    marginTop: '10px',
+    marginTop: '8px',
     padding: '6px 12px',
     backgroundColor: '#e0f2fe',
     color: '#0369a1',
     borderRadius: '8px',
     fontSize: '12px',
     fontWeight: '700',
-    lineHeight: '1.4',
   },
-  photoBox: {
-    width: '110px',
-    height: '110px',
+  photoContainer: {
+    margin: '15px 0',
+    display: 'flex',
+    justifyContent: 'center',
+  },
+  photoImg: {
+    width: '120px',
+    height: '120px',
     borderRadius: '16px',
-    overflow: 'hidden',
+    objectFit: 'cover',
     border: '3px solid #0288d1',
     boxShadow: '0 8px 16px rgba(2, 136, 209, 0.25)',
-    flexShrink: 0,
-    backgroundColor: '#f1f5f9',
-  },
-  photoImage: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
   },
   btnPrimary: {
     width: '100%',
@@ -295,10 +275,6 @@ const styles = {
     fontSize: '15px',
     cursor: 'pointer',
     boxShadow: '0 8px 20px rgba(2, 136, 209, 0.3)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s ease',
   },
   btnSecondary: {
     display: 'block',
@@ -319,7 +295,6 @@ const styles = {
     borderRadius: '20px',
     padding: '35px',
     boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
   },
   contactHeader: {
     textAlign: 'center',
@@ -352,7 +327,6 @@ const styles = {
     borderRadius: '12px',
     textDecoration: 'none',
     border: '1px solid #e2e8f0',
-    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
   },
   directContactGrid: {
     display: 'grid',
@@ -368,7 +342,6 @@ const styles = {
     backgroundColor: '#f8fafc',
     padding: '15px 20px',
     borderRadius: '14px',
-    border: '1px solid #f1f5f9',
   },
   contactIconCircle: {
     width: '42px',
