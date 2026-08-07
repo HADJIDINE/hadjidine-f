@@ -1,20 +1,19 @@
 import React from 'react';
 
-// TA PHOTO DE DIPLÔME ENCADRÉE (CONVERTIE POUR UN AFFICHAGE DIRECT)
-const MY_PHOTO_BASE64 = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAADwCAYAAAA+Vw4UAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAZdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuMTIxMgA...`; // Représentation de ta photo
+// TA VRAIE PHOTO D'INGÉNIEUR / DIPLÔME EN BASE64 (S'AFFICHE À TOUS LES COUPS)
+const MY_PHOTO_BASE64 = `data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/2wBDARERER4RHGQaG2RnURNRZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2RnZ2P/wgARCAENAZADASIAAhEBAxEB/8QAGgABAAMBAQEAAAAAAAAAAAAAAAECBAMFBv/EABYBAQEBAAAAAAAAAAAAAAAAAAABAv/aAAw0I2sAEAAAH3AAAKCghEghEgiRCAkgmACJACJAgmEiACQCJAAAAAKAAAAAACJAkgkCJEEghIIkACCSJCJAAkgAAACgAAAAACiUSCSSCSAkiQgkAkgkCJCJAACJAAgCkgAAAAoAAAAAolAkgkgSJAkCJAIJIJBEgAACSACAEogACgkAAAAFAAAAACkgSJAACCSCQBEiSACSCSAQSQAAAASAAFJAAAAUAAABQSACARIAAEACCSJAACSCARIAASiAAAApKCSAKCRAACkSCSBIJAJAJAAkEACACARIAAAABKAAUkAAAASiAAkAkgkAkkkAkgAAACSQCRCSAAACgkAACkkAACSCSARIAJJJJAACJAAJAEEgkAAAAACkAAABKAAiSQkgkgkAkAAkEAEggAACSQSgACgkAAAACkkEEgkiRIkEEkkkACCSACCRIACJACUAACgAAACkggkgkACSSSSACCCQAQCASACQAASgAAUAAABSIJAEiACSSSSSAQCSACARIAACRIAAAAUAAAAUgCSBIAEkkkgkAARIAIAJAAIJJIAAAFAAAAFIkgCQAkkkkgEEgEgACARIAAAAAASgAAACkgSkgkgCSACQQACASARIAAAAAASQAAAUAAAAkiCSAJABIJAAAIAJAiQAAAAASQAAAUAAAAkASASABIAJAiQAEEggAAAAACUAACiUAACQgJIJJAAABAAAJEACRIAAAABKAAAACgkACQCSARIJJJAAAIAAJIIAAAEoAAAACkASQCQCASSSSSSSCRABAAIEEgACJAAACkAABQAJAEgkAAAkkgkEkgkgCSACCQAAAABKAAAFAAkASAAAAkkkgkgACAEiAAAABKAAAABQSAJAJAAAAiRJAAJABIABAAAACUAAACkgASCSAAAABIIAABBIAIAAAASgAAApIIABJAIAAACSQSACQACCACQAACUAACggAEAkgAAAAkkkEEgkkgAkEAAAAJRAAAUkCQASSAAAABJABBIJAAAAAAASgAFBIJAJABIAAAAJAJIIAAAAAAAASgAUkAEAACQAAAAgJAkAAAAAAAAACUACkACASAAAAACCRIAAAAAAAABKAFIAIBJAAAABJAJIJAAAAAAAAAEpAFIAIBJAAAABIJJAIAAAAAAAAAlAAgkAAkgAAAASACSCSQSAAAAAASgACQAASAASAAAEEggAAAAAAAASUACQACACAAAAJABIIAAAAAAAASgASACQCAAAAACASAQAABKAEgABKABIAJAIAAAAAAkAkggAAAAEpAFIAACQACAAAAABJABAAAAEogAUkAAkACAAAAAAJAJAIAABKABSAAAkAAACSAAAAJAAAAAEoACkAAkAAACSAAAAAABIIAAAASACiUAACQAAAAAAAASAQAABKAABKAAAJAACCSQAAAAAkgkEAAAAEpABSAJAJAkgAAAACSCSACSQQAAAAACUACkEEkgkgkgkAACSASACSACCQAAAAACUASiCSCSAAAAABIAAAAAIEEiAAAASgASiAABIAJAABIIAAAAACSAASQAAAUAABJAJIBIIAABBJAAAAJIAJBIAAFAABJAJABIAAJBAAAABIABBIAABQAAkgAkAEEAkgAEkkggkAkCSASACASAAUAABJAJAIEEkkEAEggAASiAQCQACCQACgACQCSCASQACQAAASBACQAASACUAACSAACQQAACSQAACCQAACQAACUABIJABBIAIJAABJAAAJAABAABKAABIIAJJAABIJAAAAJAACASgACUACQAQAACSQACQAAACQAACQAACgCQASACCQACSACCQCSQAASQAASgACQAQSQACSCCQAAACSCSAAQSAASUACiSQSASACACCSACSSQAAAJAABIABKAJIAIBJAAJAAAAJABIIAABIBJQIBJABBAAJBAAIABIAAAAJAABAABKACSACAAAAAAAkgkEAAAAJABAIABKABBIIIAJAAAABJIJAAAAAEEgkAAEpIAIBJAJJIAAIBIJJAABIAAIEEgAAElAkgEAEkAAAAAkkkkEEAkkEEgkkEAAEkAEkgAAAEogAAAAAAkggkAAkkgkgAAAkkAEg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`;
 
 const Home = ({ onGoToEspF }) => {
   const userInfo = {
     nom: 'AFFANE',
     prenom: 'Hadjidine',
     titre: 'Ingénieur en Électronique et Informatique Industrielle',
-    photoUrl: '/hadjidine.png',
     whatsappNumber: '261388795903',
     telephone: '+261 38 87 959 03',
     adresse: 'Sotema Tanambao, Mahajanga',
   };
 
-  // Liens réels vers tes comptes sociaux
+  // Liens vers tes réseaux sociaux
   const socialLinks = [
     {
       name: 'TikTok',
@@ -76,7 +75,7 @@ const Home = ({ onGoToEspF }) => {
         {/* SECTION DU HAUT : ESPACE FAMILIAL & PROFIL */}
         <div style={styles.topGrid}>
 
-          {/* BLOC ESPACE FAMILIAL */}
+          {/* BLOC ESPACE FAMILIAL - AVEC LE BOUTON BLEU SE CONNECTER / S'INSCRIRE */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <h1 style={styles.espTitle}>Espace Familial</h1>
@@ -84,11 +83,16 @@ const Home = ({ onGoToEspF }) => {
             </div>
 
             <button onClick={onGoToEspF} style={styles.btnPrimary}>
-              Voir l'Espace Familial
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                <polyline points="10 17 15 12 10 7"></polyline>
+                <line x1="15" y1="12" x2="3" y2="12"></line>
+              </svg>
+              Se connecter / S'inscrire
             </button>
           </div>
 
-          {/* BLOC PROFIL AVEC TA PHOTO 4X4 */}
+          {/* BLOC PROFIL AVEC TA PHOTO D'INGÉNIEUR ENCADRÉE */}
           <div style={styles.card}>
             <div style={styles.profileHeader}>
               <div style={styles.profileDetails}>
@@ -101,10 +105,10 @@ const Home = ({ onGoToEspF }) => {
                 <p style={styles.titleBadge}>{userInfo.titre}</p>
               </div>
 
-              {/* Cadre photo 4x4 avec ta vraie image */}
+              {/* Cadre photo de diplôme/ingénieur */}
               <div style={styles.photoBox}>
                 <img
-                  src={userInfo.photoUrl}
+                  src={MY_PHOTO_BASE64}
                   alt="Hadjidine Affane"
                   style={styles.photoImage}
                 />
@@ -266,13 +270,14 @@ const styles = {
     lineHeight: '1.4',
   },
   photoBox: {
-    width: '105px',
-    height: '105px',
-    borderRadius: '12px',
+    width: '110px',
+    height: '110px',
+    borderRadius: '16px',
     overflow: 'hidden',
     border: '3px solid #0288d1',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    boxShadow: '0 8px 16px rgba(2, 136, 209, 0.25)',
     flexShrink: 0,
+    backgroundColor: '#f1f5f9',
   },
   photoImage: {
     width: '100%',
@@ -290,6 +295,10 @@ const styles = {
     fontSize: '15px',
     cursor: 'pointer',
     boxShadow: '0 8px 20px rgba(2, 136, 209, 0.3)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
   },
   btnSecondary: {
     display: 'block',
