@@ -8,8 +8,12 @@ const Chat = () => {
 
   // 💾 SAUVEGARDE & RESTAURATION DE L'UTILISATEUR SÉLECTIONNÉ
   const [selectedUser, setSelectedUser] = useState(() => {
-    const savedUser = localStorage.getItem('chat_selected_user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    try {
+      const savedUser = localStorage.getItem('chat_selected_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (e) {
+      return null;
+    }
   });
 
   const [loading, setLoading] = useState(false);
@@ -51,7 +55,13 @@ const Chat = () => {
   const chatContainerRef = useRef(null);
 
   const token = localStorage.getItem('jwtToken');
-  const currentUserEmail = localStorage.getItem('userEmail') || '';
+
+  // ✅ RECUPERATION SECURISEE DE L'EMAIL CONNECTE (Résout le problème d'envoi et d'affichage)
+  const currentUserEmail =
+    localStorage.getItem('userEmail') ||
+    localStorage.getItem('email') ||
+    'hadjidineanffane@gmail.com';
+
   const userRole = localStorage.getItem('userRole') || 'USER';
 
   // Infos de l'utilisateur connecté
@@ -89,8 +99,8 @@ const Chat = () => {
     return `En ligne il y a ${Math.floor(diffInSeconds / 86400)} j`;
   };
 
-  // ✅ Priorise le Prénom + Nom au lieu de l'E-mail
   const getUserDisplayName = (email) => {
+    if (!email) return 'Anonyme';
     if (email === currentUserEmail) return 'Moi';
     const foundUser = users.find((u) => u.email === email);
     if (foundUser && (foundUser.prenom || foundUser.nom)) {
@@ -124,7 +134,7 @@ const Chat = () => {
     </svg>
   );
 
-  // 1. ✅ CORRECTION CORRIGÉE : Charger la liste des utilisateurs via /api/users
+  // 1. Charger la liste des utilisateurs
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -149,7 +159,7 @@ const Chat = () => {
     return () => clearInterval(interval);
   }, [token, currentUserEmail]);
 
-  // 2. Fetch Messages & Synchronisation des réactions / appels
+  // 2. Fetch Messages
   const fetchMessages = async () => {
     try {
       const receiver = selectedUser ? selectedUser.email : 'GENERAL';
@@ -192,7 +202,7 @@ const Chat = () => {
             }
           }
 
-          // ✅ Gestion synchrone du signalement d'appel (Raccrocher / Refuser / Missed)
+          // Gestion synchrone des appels
           if ((msg.receiver === currentUserEmail || msg.receiver === 'GENERAL') && !handledCallsRef.current.has(msgKey)) {
             if (content.startsWith('[CALL_REQ_AUDIO]') && !activeCall && !incomingCall) {
               setIncomingCall({ caller: msg.sender, type: 'audio' });
@@ -211,12 +221,15 @@ const Chat = () => {
             }
           }
 
+          // Détection dynamique de saisie ("En train d'écrire")
           if (
             msg.sender !== currentUserEmail &&
             (selectedUser ? msg.sender === selectedUser.email : true)
           ) {
-            if (content === '[TYPING]') isOtherTyping = true;
-            if (content === '[STOP_TYPING]') isOtherTyping = false;
+            if (content === '[TYPING]') {
+              const msgTime = new Date(msg.timestamp || Date.now()).getTime();
+              if (Date.now() - msgTime < 5000) isOtherTyping = true;
+            }
           }
         });
 
@@ -248,7 +261,10 @@ const Chat = () => {
   };
 
   const sendPayloadToBackend = async (contentPayload, targetReceiver = null) => {
-    if (!currentUserEmail) return;
+    if (!currentUserEmail) {
+      alert("Email utilisateur non identifié. Veuillez rafraîchir la page.");
+      return;
+    }
 
     let finalContent = contentPayload;
     if (replyingTo && !contentPayload.startsWith('[')) {
@@ -335,7 +351,7 @@ const Chat = () => {
       setRecordingTime(0);
       timerRef.current = setInterval(() => setRecordingTime((prev) => prev + 1), 1000);
     } catch (err) {
-      alert('Aucun microphone détecté.');
+      alert('Microphone non accessible ou non connecté.');
     }
   };
 
@@ -354,7 +370,7 @@ const Chat = () => {
       localStreamRef.current = stream;
       return true;
     } catch (err) {
-      alert(`Impossible d'initier l'appel : Matériel non détecté.`);
+      alert(`Matériel (micro/caméra) introuvable ou bloqué.`);
       return false;
     }
   };
@@ -440,7 +456,7 @@ const Chat = () => {
         color: isDarkMode ? '#e0e0e0' : '#333',
       }}
     >
-      {/* SIDEBAR AVEC LISTE DES MEMBRES */}
+      {/* SIDEBAR */}
       <div
         style={{
           ...styles.sidebar,
@@ -560,7 +576,6 @@ const Chat = () => {
             <h3 style={{ margin: 0, color: isDarkMode ? '#fff' : '#333' }}>📢 Groupe Familial (Général)</h3>
           )}
 
-          {/* ZONE DROITE AVEC APPLI/BOUTONS */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ fontSize: '13px', fontWeight: 'bold', color: isDarkMode ? '#e0e0e0' : '#555', display: 'flex', alignItems: 'center' }}>
               👤 {currentUserName} {isAdmin && <VerifiedBadge />}
@@ -701,7 +716,7 @@ const Chat = () => {
                           left: isMe ? '-10px' : 'auto',
                           right: isMe ? 'auto' : '-10px',
                         }}
-                        title="Cliquer pour voir les réactions"
+                        title="Voir les réactions"
                       >
                         {uniqueEmojis.join('')} <span style={{ fontSize: '11px', marginLeft: '2px', fontWeight: 'bold' }}>{totalReactionsCount}</span>
                       </div>
@@ -780,7 +795,7 @@ const Chat = () => {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* EMOJIS / STICKERS */}
+        {/* BARRE D'EMOJIS */}
         {showStickers && (
           <div style={{ ...styles.stickerBar, backgroundColor: isDarkMode ? '#252526' : '#fff', borderTopColor: isDarkMode ? '#333' : '#eee' }}>
             {stickers.map((stk, i) => (
@@ -791,7 +806,7 @@ const Chat = () => {
           </div>
         )}
 
-        {/* CITER LE MESSAGE */}
+        {/* APERÇU DE LA RÉPONSE */}
         {replyingTo && (
           <div style={{ ...styles.replyBar, backgroundColor: isDarkMode ? '#1a365d' : '#e3f2fd', borderTopColor: isDarkMode ? '#2b6cb0' : '#bbdefb' }}>
             <div>
@@ -846,7 +861,7 @@ const Chat = () => {
         </form>
       </div>
 
-      {/* POP-UPS D'APPEL ENTRANT & EN COURS */}
+      {/* MODALES D'APPELS */}
       {incomingCall && (
         <div style={styles.callOverlay}>
           <div style={{ ...styles.callModal, backgroundColor: isDarkMode ? '#2d2d2d' : '#fff', color: isDarkMode ? '#fff' : '#333' }}>
