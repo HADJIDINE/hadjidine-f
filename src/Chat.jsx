@@ -261,7 +261,7 @@ const Chat = () => {
       const headers = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      await fetch('https://hadjidine-b.onrender.com/api/messages', {
+      await fetch('http://localhost:8080/api/messages', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(payload),
