@@ -1,233 +1,201 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from './supabaseClient';
 
 export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState('users'); // Onglet par défaut
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [users, setUsers] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Liste des utilisateurs
-  const [users, setUsers] = useState([
-    { id: 1, name: 'Hadjidine', email: 'hadjidineanffane@gmail.com', role: 'Admin', status: 'Actif' },
-    { id: 2, name: 'Étudiant ESP F', email: 'etudiant1@espf.mg', role: 'Membre', status: 'Actif' },
-    { id: 3, name: 'Utilisateur Test', email: 'test@espf.mg', role: 'Membre', status: 'Inactif' },
-  ]);
+  // Charger les données depuis Supabase
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  // Liste des messages du chat
-  const [messages, setMessages] = useState([
-    { id: 101, user: 'Étudiant ESP F', text: 'Bonjour tout le monde !', time: '10:30' },
-    { id: 102, user: 'Utilisateur Test', text: 'Message de test pour la modération.', time: '11:15' },
-  ]);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // 1. Charger les utilisateurs (depuis la table 'profiles' ou 'users')
+      const { data: usersData, error: usersError } = await supabase
+        .from('profiles') // Ajuste si le nom de ta table est 'users'
+        .select('*');
 
-  // Paramètres système
-  const [settings, setSettings] = useState({
-    maintenanceMode: false,
-    allowRegistrations: true,
-    chatEnabled: true,
-  });
+      if (!usersError && usersData) setUsers(usersData);
 
-  // Actions Utilisateurs
-  const handleToggleStatus = (id) => {
-    setUsers(users.map(u => u.id === id ? { ...u, status: u.status === 'Actif' ? 'Banni' : 'Actif' } : u));
-  };
+      // 2. Charger les messages du chat (depuis la table 'messages')
+      const { data: msgData, error: msgError } = await supabase
+        .from('messages')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-  const handleDeleteUser = (id) => {
-    if (window.confirm('Voulez-vous vraiment supprimer cet utilisateur ?')) {
-      setUsers(users.filter(u => u.id !== id));
+      if (!msgError && msgData) setMessages(msgData);
+    } catch (err) {
+      console.error('Erreur lors du chargement des données Supabase :', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleChangeRole = (id, newRole) => {
-    setUsers(users.map(u => u.id === id ? { ...u, role: newRole } : u));
+  // Suppression d'un message dans Supabase
+  const handleDeleteMessage = async (id) => {
+    if (!window.confirm('Voulez-vous vraiment supprimer ce message du chat ?')) return;
+
+    const { error } = await supabase.from('messages').delete().eq('id', id);
+    if (!error) {
+      setMessages(messages.filter((m) => m.id !== id));
+    } else {
+      alert('Erreur lors de la suppression : ' + error.message);
+    }
   };
 
-  // Action Modération Chat
-  const handleDeleteMessage = (id) => {
-    setMessages(messages.filter(m => m.id !== id));
+  // Bannir/Débannir un utilisateur dans Supabase
+  const handleToggleBan = async (user) => {
+    const newStatus = !user.is_banned;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_banned: newStatus })
+      .eq('id', user.id);
+
+    if (!error) {
+      setUsers(users.map((u) => (u.id === user.id ? { ...u, is_banned: newStatus } : u)));
+    } else {
+      alert('Erreur lors du changement de statut : ' + error.message);
+    }
   };
+
+  if (loading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>
+        🔄 Chargement des données Supabase...
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: '1100px', margin: '30px auto', padding: '20px', fontFamily: 'Segoe UI, sans-serif' }}>
-      <h1 style={{ textAlign: 'center', marginBottom: '25px', color: '#0f172a' }}>
-        ⚙️ Panneau d'Administration
-      </h1>
-
-      {/* Barre de navigation / Onglets */}
-      <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '30px', borderBottom: '2px solid #e2e8f0', paddingBottom: '12px' }}>
-        <button
-          onClick={() => setActiveTab('dashboard')}
-          style={tabButtonStyle(activeTab === 'dashboard')}
-        >
-          📊 Tableau de bord
-        </button>
-        <button
-          onClick={() => setActiveTab('users')}
-          style={tabButtonStyle(activeTab === 'users')}
-        >
-          👥 Utilisateurs ({users.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('messages')}
-          style={tabButtonStyle(activeTab === 'messages')}
-        >
-          💬 Messages Chat ({messages.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('settings')}
-          style={tabButtonStyle(activeTab === 'settings')}
-        >
-          ⚙️ Paramètres
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+        <h1 style={{ margin: 0, color: '#0f172a' }}>⚙️ Panneau d'Administration (Supabase)</h1>
+        <button onClick={fetchData} style={{ padding: '8px 16px', backgroundColor: '#0288d1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
+          🔄 Actualiser
         </button>
       </div>
 
-      {/* 1. ONGLET TABLEAU DE BORD */}
+      {/* Onglets */}
+      <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '30px', borderBottom: '2px solid #e2e8f0', paddingBottom: '12px' }}>
+        <button onClick={() => setActiveTab('dashboard')} style={tabButtonStyle(activeTab === 'dashboard')}>
+          📊 Tableau de bord
+        </button>
+        <button onClick={() => setActiveTab('users')} style={tabButtonStyle(activeTab === 'users')}>
+          👥 Utilisateurs ({users.length})
+        </button>
+        <button onClick={() => setActiveTab('messages')} style={tabButtonStyle(activeTab === 'messages')}>
+          💬 Messages Chat ({messages.length})
+        </button>
+      </div>
+
+      {/* 📊 TABLEAU DE BORD */}
       {activeTab === 'dashboard' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
           <div style={cardStyle('#3b82f6')}>
-            <h3 style={{ margin: 0, color: '#475569' }}>Utilisateurs Totaux</h3>
+            <h3 style={{ margin: 0, color: '#475569' }}>Utilisateurs Inscrits</h3>
             <p style={{ fontSize: '2.2rem', fontWeight: 'bold', margin: '10px 0 0', color: '#1e293b' }}>{users.length}</p>
           </div>
           <div style={cardStyle('#10b981')}>
-            <h3 style={{ margin: 0, color: '#475569' }}>Membres Actifs</h3>
+            <h3 style={{ margin: 0, color: '#475569' }}>Comptes Actifs</h3>
             <p style={{ fontSize: '2.2rem', fontWeight: 'bold', margin: '10px 0 0', color: '#166534' }}>
-              {users.filter(u => u.status === 'Actif').length}
+              {users.filter((u) => !u.is_banned).length}
             </p>
           </div>
           <div style={cardStyle('#f59e0b')}>
-            <h3 style={{ margin: 0, color: '#475569' }}>Messages Envoyés</h3>
+            <h3 style={{ margin: 0, color: '#475569' }}>Messages dans le Chat</h3>
             <p style={{ fontSize: '2.2rem', fontWeight: 'bold', margin: '10px 0 0', color: '#92400e' }}>{messages.length}</p>
           </div>
           <div style={cardStyle('#ef4444')}>
             <h3 style={{ margin: 0, color: '#475569' }}>Utilisateurs Bannis</h3>
             <p style={{ fontSize: '2.2rem', fontWeight: 'bold', margin: '10px 0 0', color: '#991b1b' }}>
-              {users.filter(u => u.status === 'Banni').length}
+              {users.filter((u) => u.is_banned).length}
             </p>
           </div>
         </div>
       )}
 
-      {/* 2. ONGLET GESTION DES UTILISATEURS */}
+      {/* 👥 LISTE DES UTILISATEURS */}
       {activeTab === 'users' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
-          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Gestion des Utilisateurs</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '15px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
-                <th style={tableCellHeader}>Nom</th>
-                <th style={tableCellHeader}>Email</th>
-                <th style={tableCellHeader}>Rôle</th>
-                <th style={tableCellHeader}>Statut</th>
-                <th style={tableCellHeader}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={tableCell}><strong>{u.name}</strong></td>
-                  <td style={tableCell}>{u.email}</td>
-                  <td style={tableCell}>
-                    <select
-                      value={u.role}
-                      onChange={(e) => handleChangeRole(u.id, e.target.value)}
-                      style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: '#fff' }}
-                    >
-                      <option value="Membre">Membre</option>
-                      <option value="Admin">Admin</option>
-                      <option value="Modérateur">Modérateur</option>
-                    </select>
-                  </td>
-                  <td style={tableCell}>
-                    <span style={{
-                      padding: '4px 10px',
-                      borderRadius: '12px',
-                      fontSize: '0.85rem',
-                      fontWeight: 'bold',
-                      backgroundColor: u.status === 'Actif' ? '#dcfce7' : '#fee2e2',
-                      color: u.status === 'Actif' ? '#15803d' : '#b91c1c'
-                    }}>
-                      {u.status}
-                    </span>
-                  </td>
-                  <td style={tableCell}>
-                    <button
-                      onClick={() => handleToggleStatus(u.id)}
-                      style={{ ...actionBtnStyle, backgroundColor: u.status === 'Actif' ? '#f59e0b' : '#10b981', color: '#fff' }}
-                    >
-                      {u.status === 'Actif' ? 'Bannir' : 'Débannir'}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteUser(u.id)}
-                      style={{ ...actionBtnStyle, backgroundColor: '#ef4444', color: '#fff', marginLeft: '8px' }}
-                    >
-                      Supprimer
-                    </button>
-                  </td>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Membres enregistrés sur Supabase</h2>
+          {users.length === 0 ? (
+            <p style={{ color: '#64748b' }}>Aucun utilisateur trouvé.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '15px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
+                  <th style={tableCellHeader}>Nom / Email</th>
+                  <th style={tableCellHeader}>Rôle</th>
+                  <th style={tableCellHeader}>Statut</th>
+                  <th style={tableCellHeader}>Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={tableCell}>
+                      <strong>{u.full_name || u.username || u.email || 'Membre'}</strong>
+                      <br />
+                      <small style={{ color: '#64748b' }}>{u.email}</small>
+                    </td>
+                    <td style={tableCell}>{u.role || 'ROLE_USER'}</td>
+                    <td style={tableCell}>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        backgroundColor: u.is_banned ? '#fee2e2' : '#dcfce7',
+                        color: u.is_banned ? '#b91c1c' : '#15803d',
+                      }}>
+                        {u.is_banned ? 'Banni' : 'Actif'}
+                      </span>
+                    </td>
+                    <td style={tableCell}>
+                      <button
+                        onClick={() => handleToggleBan(u)}
+                        style={{ ...actionBtnStyle, backgroundColor: u.is_banned ? '#10b981' : '#f59e0b', color: '#fff' }}
+                      >
+                        {u.is_banned ? 'Débannir' : 'Bannir'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
-      {/* 3. ONGLET MODÉRATION DES MESSAGES */}
+      {/* 💬 MODÉRATION DES MESSAGES */}
       {activeTab === 'messages' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
-          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Modération du Chat ESP F</h2>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Messages réels du Chat</h2>
           {messages.length === 0 ? (
-            <p style={{ color: '#64748b' }}>Aucun message à afficher pour le moment.</p>
+            <p style={{ color: '#64748b' }}>Aucun message à afficher.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
               {messages.map((m) => (
                 <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div>
-                    <strong style={{ color: '#0f172a' }}>{m.user}</strong> <small style={{ color: '#64748b', marginLeft: '6px' }}>({m.time})</small>
-                    <p style={{ margin: '6px 0 0 0', color: '#334155', fontSize: '1rem' }}>{m.text}</p>
+                    <strong style={{ color: '#0f172a' }}>{m.user_email || m.username || 'Utilisateur'}</strong>
+                    <p style={{ margin: '6px 0 0 0', color: '#334155' }}>{m.content || m.text}</p>
                   </div>
                   <button
                     onClick={() => handleDeleteMessage(m.id)}
                     style={{ ...actionBtnStyle, backgroundColor: '#ef4444', color: '#fff' }}
                   >
-                    Supprimer le message
+                    Supprimer du chat
                   </button>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {/* 4. ONGLET PARAMÈTRES DU SYSTÈME */}
-      {activeTab === 'settings' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e2e8f0' }}>
-          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Paramètres de la Plateforme</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', marginTop: '20px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', fontSize: '1rem', color: '#334155' }}>
-              <input
-                type="checkbox"
-                style={{ width: '18px', height: '18px' }}
-                checked={settings.maintenanceMode}
-                onChange={(e) => setSettings({ ...settings, maintenanceMode: e.target.checked })}
-              />
-              <strong>Activer le Mode Maintenance</strong>
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', fontSize: '1rem', color: '#334155' }}>
-              <input
-                type="checkbox"
-                style={{ width: '18px', height: '18px' }}
-                checked={settings.allowRegistrations}
-                onChange={(e) => setSettings({ ...settings, allowRegistrations: e.target.checked })}
-              />
-              <strong>Autoriser les nouvelles inscriptions</strong>
-            </label>
-
-            <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', fontSize: '1rem', color: '#334155' }}>
-              <input
-                type="checkbox"
-                style={{ width: '18px', height: '18px' }}
-                checked={settings.chatEnabled}
-                onChange={(e) => setSettings({ ...settings, chatEnabled: e.target.checked })}
-              />
-              <strong>Activer le service de Chat</strong>
-            </label>
-          </div>
         </div>
       )}
     </div>
@@ -239,12 +207,10 @@ const tabButtonStyle = (isActive) => ({
   padding: '10px 20px',
   borderRadius: '8px',
   border: 'none',
-  backgroundColor: isActive ? '#2563eb' : '#f1f5f9',
+  backgroundColor: isActive ? '#0288d1' : '#f1f5f9',
   color: isActive ? '#ffffff' : '#475569',
   fontWeight: 'bold',
-  fontSize: '0.95rem',
   cursor: 'pointer',
-  transition: 'all 0.2s',
 });
 
 const cardStyle = (bgColor) => ({
@@ -253,25 +219,8 @@ const cardStyle = (bgColor) => ({
   borderRadius: '10px',
   padding: '20px',
   boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
-  border: '1px solid #e2e8f0',
 });
 
-const tableCellHeader = {
-  padding: '12px 16px',
-  color: '#475569',
-  fontSize: '0.9rem',
-};
-
-const tableCell = {
-  padding: '14px 16px',
-  color: '#334155',
-};
-
-const actionBtnStyle = {
-  border: 'none',
-  padding: '6px 12px',
-  borderRadius: '6px',
-  fontSize: '0.85rem',
-  cursor: 'pointer',
-  fontWeight: '600',
-};
+const tableCellHeader = { padding: '12px 16px', color: '#475569', fontSize: '0.9rem' };
+const tableCell = { padding: '14px 16px', color: '#334155' };
+const actionBtnStyle = { border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600' };
