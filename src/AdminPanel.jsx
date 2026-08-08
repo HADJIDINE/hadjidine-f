@@ -15,22 +15,30 @@ export default function AdminPanel() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Charger les utilisateurs (depuis la table 'profiles' ou 'users')
+      // 1. Charger les utilisateurs depuis la table 'users'
       const { data: usersData, error: usersError } = await supabase
-        .from('profiles') // Ajuste si le nom de ta table est 'users'
+        .from('users') // <--- Mise à jour avec la table 'users'
         .select('*');
 
-      if (!usersError && usersData) setUsers(usersData);
+      if (usersError) {
+        console.error('Erreur table users:', usersError.message);
+      } else if (usersData) {
+        setUsers(usersData);
+      }
 
-      // 2. Charger les messages du chat (depuis la table 'messages')
+      // 2. Charger les messages du chat depuis la table 'messages'
       const { data: msgData, error: msgError } = await supabase
         .from('messages')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!msgError && msgData) setMessages(msgData);
+      if (msgError) {
+        console.error('Erreur table messages:', msgError.message);
+      } else if (msgData) {
+        setMessages(msgData);
+      }
     } catch (err) {
-      console.error('Erreur lors du chargement des données Supabase :', err);
+      console.error('Erreur globale Supabase :', err);
     } finally {
       setLoading(false);
     }
@@ -48,11 +56,11 @@ export default function AdminPanel() {
     }
   };
 
-  // Bannir/Débannir un utilisateur dans Supabase
+  // Bannir/Débannir un utilisateur dans la table 'users'
   const handleToggleBan = async (user) => {
     const newStatus = !user.is_banned;
     const { error } = await supabase
-      .from('profiles')
+      .from('users')
       .update({ is_banned: newStatus })
       .eq('id', user.id);
 
@@ -66,7 +74,7 @@ export default function AdminPanel() {
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>
-        🔄 Chargement des données Supabase...
+        🔄 Connexion à la table `users` Supabase...
       </div>
     );
   }
@@ -74,7 +82,7 @@ export default function AdminPanel() {
   return (
     <div style={{ maxWidth: '1100px', margin: '30px auto', padding: '20px', fontFamily: 'Segoe UI, sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
-        <h1 style={{ margin: 0, color: '#0f172a' }}>⚙️ Panneau d'Administration (Supabase)</h1>
+        <h1 style={{ margin: 0, color: '#0f172a' }}>⚙️ Panneau d'Administration</h1>
         <button onClick={fetchData} style={{ padding: '8px 16px', backgroundColor: '#0288d1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
           🔄 Actualiser
         </button>
@@ -119,12 +127,12 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* 👥 LISTE DES UTILISATEURS */}
+      {/* 👥 LISTE DES UTILISATEURS DE LA TABLE 'USERS' */}
       {activeTab === 'users' && (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Membres enregistrés sur Supabase</h2>
+          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Membres (Table `users`)</h2>
           {users.length === 0 ? (
-            <p style={{ color: '#64748b' }}>Aucun utilisateur trouvé.</p>
+            <p style={{ color: '#64748b' }}>Aucun utilisateur trouvé dans la table `users`.</p>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '15px' }}>
               <thead>
@@ -139,7 +147,7 @@ export default function AdminPanel() {
                 {users.map((u) => (
                   <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={tableCell}>
-                      <strong>{u.full_name || u.username || u.email || 'Membre'}</strong>
+                      <strong>{u.full_name || u.username || u.name || u.email || 'Membre'}</strong>
                       <br />
                       <small style={{ color: '#64748b' }}>{u.email}</small>
                     </td>
@@ -175,16 +183,16 @@ export default function AdminPanel() {
       {/* 💬 MODÉRATION DES MESSAGES */}
       {activeTab === 'messages' && (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Messages réels du Chat</h2>
+          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Messages du Chat</h2>
           {messages.length === 0 ? (
-            <p style={{ color: '#64748b' }}>Aucun message à afficher.</p>
+            <p style={{ color: '#64748b' }}>Aucun message trouvé.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
               {messages.map((m) => (
                 <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div>
-                    <strong style={{ color: '#0f172a' }}>{m.user_email || m.username || 'Utilisateur'}</strong>
-                    <p style={{ margin: '6px 0 0 0', color: '#334155' }}>{m.content || m.text}</p>
+                    <strong style={{ color: '#0f172a' }}>{m.user_email || m.username || m.sender || 'Utilisateur'}</strong>
+                    <p style={{ margin: '6px 0 0 0', color: '#334155' }}>{m.content || m.text || m.message}</p>
                   </div>
                   <button
                     onClick={() => handleDeleteMessage(m.id)}
