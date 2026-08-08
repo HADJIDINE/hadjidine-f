@@ -34,7 +34,7 @@ function App() {
     setActiveTab('home'); // Retour à l'accueil lors de la déconnexion
   };
 
-  // Fonction transmise à Home.jsx pour le bouton "Voir l'ESP F"
+  // Fonction transmise à Home.jsx pour le bouton "Espace Familial"
   const handleGoToEspF = () => {
     if (user) {
       setActiveTab('chat');
@@ -44,32 +44,24 @@ function App() {
   };
 
   return (
-    <div style={{ backgroundColor: '#f4f6f8', minHeight: '100vh', fontFamily: "'Segoe UI', sans-serif" }}>
-      {/* BARRE DE NAVIGATION SUPÉRIEURE */}
+    <div style={{ backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+      {/* BARRE DE NAVIGATION MODERNE */}
       <header style={styles.navbar}>
         <div style={styles.navLeft}>
           <button
             onClick={() => setActiveTab('home')}
-            style={{
-              ...styles.navBtn,
-              fontWeight: activeTab === 'home' ? 'bold' : 'normal',
-              borderBottom: activeTab === 'home' ? '2px solid #0288d1' : 'none',
-            }}
+            style={activeTab === 'home' ? styles.navBtnActive : styles.navBtn}
           >
             🏠 Accueil
           </button>
 
-          {/* Accès à l'ESP F (Chat) si connecté */}
+          {/* Accès à l'Espace Familial (Chat) si connecté */}
           {user && (
             <button
               onClick={() => setActiveTab('chat')}
-              style={{
-                ...styles.navBtn,
-                fontWeight: activeTab === 'chat' ? 'bold' : 'normal',
-                borderBottom: activeTab === 'chat' ? '2px solid #0288d1' : 'none',
-              }}
+              style={activeTab === 'chat' ? styles.navBtnActive : styles.navBtn}
             >
-              💬 ESP F (Chat)
+              💬 Espace Familial (Chat)
             </button>
           )}
 
@@ -77,37 +69,24 @@ function App() {
           {user && user.role === 'ROLE_ADMIN' && (
             <button
               onClick={() => setActiveTab('admin')}
-              style={{
-                ...styles.navBtn,
-                fontWeight: activeTab === 'admin' ? 'bold' : 'normal',
-                borderBottom: activeTab === 'admin' ? '2px solid #0288d1' : 'none',
-              }}
+              style={activeTab === 'admin' ? styles.navBtnActive : styles.navBtn}
             >
               🛠️ Administration
             </button>
           )}
         </div>
 
-        {/* CÔTÉ DROIT : Utilisateur & Connexion / Déconnexion */}
+        {/* CÔTÉ DROIT : Affiché uniquement une fois connecté */}
         <div style={styles.navRight}>
-          {user ? (
-            <>
-              <span style={styles.userEmail}>👤 {user.email}</span>
+          {user && (
+            <div style={styles.userSection}>
+              <span style={styles.userBadge}>
+                👤 {user.email}
+              </span>
               <button onClick={handleLogout} style={styles.btnLogout}>
                 Déconnexion
               </button>
-            </>
-          ) : (
-            <button
-              onClick={() => setActiveTab('auth')}
-              style={{
-                ...styles.btnLoginNav,
-                backgroundColor: activeTab === 'auth' ? '#0288d1' : '#ffffff',
-                color: activeTab === 'auth' ? '#ffffff' : '#0288d1',
-              }}
-            >
-              Se connecter / S'inscrire
-            </button>
+            </div>
           )}
         </div>
       </header>
@@ -135,52 +114,75 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '12px 24px',
+    padding: '14px 32px',
     backgroundColor: '#ffffff',
-    borderBottom: '1px solid #e0e0e0',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+    borderBottom: '1px solid #e2e8f0',
+    boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 1000,
   },
   navLeft: {
     display: 'flex',
-    gap: '15px',
+    gap: '12px',
     alignItems: 'center',
   },
   navRight: {
     display: 'flex',
-    gap: '15px',
     alignItems: 'center',
   },
   navBtn: {
-    background: 'none',
+    background: 'transparent',
     border: 'none',
     fontSize: '15px',
+    fontWeight: '600',
     cursor: 'pointer',
-    padding: '6px 10px',
-    color: '#333',
+    padding: '10px 18px',
+    color: '#475569',
+    borderRadius: '10px',
+    transition: 'all 0.2s ease',
   },
-  userEmail: {
+  navBtnActive: {
+    background: '#f0f9ff',
+    border: 'none',
+    fontSize: '15px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    padding: '10px 18px',
+    color: '#0288d1',
+    borderRadius: '10px',
+    boxShadow: '0 2px 8px rgba(2, 136, 209, 0.12)',
+  },
+  userSection: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    backgroundColor: '#f8fafc',
+    padding: '6px 6px 6px 14px',
+    borderRadius: '30px',
+    border: '1px solid #e2e8f0',
+  },
+  userBadge: {
     fontSize: '14px',
-    fontWeight: 'bold',
-    color: '#555',
+    fontWeight: '600',
+    color: '#334155',
   },
   btnLogout: {
-    padding: '6px 14px',
-    backgroundColor: '#d32f2f',
-    color: '#fff',
+    padding: '8px 18px',
+    backgroundColor: '#ef4444',
+    color: '#ffffff',
     border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-  },
-  btnLoginNav: {
-    padding: '6px 14px',
-    border: '1.5px solid #0288d1',
     borderRadius: '20px',
     cursor: 'pointer',
-    fontWeight: 'bold',
+    fontWeight: '600',
+    fontSize: '13px',
+    boxShadow: '0 2px 6px rgba(239, 68, 68, 0.25)',
+    transition: 'background 0.2s ease',
   },
   mainContent: {
-    padding: '20px',
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '24px 20px',
   },
 };
 
