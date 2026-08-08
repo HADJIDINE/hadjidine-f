@@ -17,7 +17,7 @@ export default function AdminPanel() {
     try {
       // 1. Charger les utilisateurs depuis la table 'users'
       const { data: usersData, error: usersError } = await supabase
-        .from('users') // <--- Mise à jour avec la table 'users'
+        .from('users')
         .select('*');
 
       if (usersError) {
@@ -26,11 +26,11 @@ export default function AdminPanel() {
         setUsers(usersData);
       }
 
-      // 2. Charger les messages du chat depuis la table 'messages'
+      // 2. Charger les messages depuis la table 'messages' triés par 'timestamp'
       const { data: msgData, error: msgError } = await supabase
         .from('messages')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('timestamp', { ascending: false });
 
       if (msgError) {
         console.error('Erreur table messages:', msgError.message);
@@ -44,9 +44,9 @@ export default function AdminPanel() {
     }
   };
 
-  // Suppression d'un message dans Supabase
+  // Suppression d'un message
   const handleDeleteMessage = async (id) => {
-    if (!window.confirm('Voulez-vous vraiment supprimer ce message du chat ?')) return;
+    if (!window.confirm('Voulez-vous vraiment supprimer ce message ?')) return;
 
     const { error } = await supabase.from('messages').delete().eq('id', id);
     if (!error) {
@@ -56,16 +56,16 @@ export default function AdminPanel() {
     }
   };
 
-  // Bannir/Débannir un utilisateur dans la table 'users'
-  const handleToggleBan = async (user) => {
-    const newStatus = !user.is_banned;
+  // Activer / Désactiver un compte utilisateur (champ 'active')
+  const handleToggleActive = async (user) => {
+    const newStatus = !user.active;
     const { error } = await supabase
       .from('users')
-      .update({ is_banned: newStatus })
+      .update({ active: newStatus })
       .eq('id', user.id);
 
     if (!error) {
-      setUsers(users.map((u) => (u.id === user.id ? { ...u, is_banned: newStatus } : u)));
+      setUsers(users.map((u) => (u.id === user.id ? { ...u, active: newStatus } : u)));
     } else {
       alert('Erreur lors du changement de statut : ' + error.message);
     }
@@ -74,7 +74,7 @@ export default function AdminPanel() {
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>
-        🔄 Connexion à la table `users` Supabase...
+        🔄 Connexion aux tables `users` et `messages`...
       </div>
     );
   }
@@ -111,33 +111,34 @@ export default function AdminPanel() {
           <div style={cardStyle('#10b981')}>
             <h3 style={{ margin: 0, color: '#475569' }}>Comptes Actifs</h3>
             <p style={{ fontSize: '2.2rem', fontWeight: 'bold', margin: '10px 0 0', color: '#166534' }}>
-              {users.filter((u) => !u.is_banned).length}
+              {users.filter((u) => u.active).length}
             </p>
           </div>
           <div style={cardStyle('#f59e0b')}>
-            <h3 style={{ margin: 0, color: '#475569' }}>Messages dans le Chat</h3>
+            <h3 style={{ margin: 0, color: '#475569' }}>Messages Envoyés</h3>
             <p style={{ fontSize: '2.2rem', fontWeight: 'bold', margin: '10px 0 0', color: '#92400e' }}>{messages.length}</p>
           </div>
           <div style={cardStyle('#ef4444')}>
-            <h3 style={{ margin: 0, color: '#475569' }}>Utilisateurs Bannis</h3>
+            <h3 style={{ margin: 0, color: '#475569' }}>Comptes Inactifs</h3>
             <p style={{ fontSize: '2.2rem', fontWeight: 'bold', margin: '10px 0 0', color: '#991b1b' }}>
-              {users.filter((u) => u.is_banned).length}
+              {users.filter((u) => !u.active).length}
             </p>
           </div>
         </div>
       )}
 
-      {/* 👥 LISTE DES UTILISATEURS DE LA TABLE 'USERS' */}
+      {/* 👥 LISTE DES UTILISATEURS */}
       {activeTab === 'users' && (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Membres (Table `users`)</h2>
+          <h2 style={{ marginTop: 0, color: '#1e293b' }}>Membres Inscrits</h2>
           {users.length === 0 ? (
-            <p style={{ color: '#64748b' }}>Aucun utilisateur trouvé dans la table `users`.</p>
+            <p style={{ color: '#64748b' }}>Aucun utilisateur dans la base de données.</p>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '15px' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
-                  <th style={tableCellHeader}>Nom / Email</th>
+                  <th style={tableCellHeader}>Nom / Prénom</th>
+                  <th style={tableCellHeader}>Email</th>
                   <th style={tableCellHeader}>Rôle</th>
                   <th style={tableCellHeader}>Statut</th>
                   <th style={tableCellHeader}>Action</th>
@@ -147,29 +148,28 @@ export default function AdminPanel() {
                 {users.map((u) => (
                   <tr key={u.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={tableCell}>
-                      <strong>{u.full_name || u.username || u.name || u.email || 'Membre'}</strong>
-                      <br />
-                      <small style={{ color: '#64748b' }}>{u.email}</small>
+                      <strong>{u.prenom} {u.nom}</strong>
                     </td>
-                    <td style={tableCell}>{u.role || 'ROLE_USER'}</td>
+                    <td style={tableCell}>{u.email}</td>
+                    <td style={tableCell}>{u.role || 'Membre'}</td>
                     <td style={tableCell}>
                       <span style={{
                         padding: '4px 10px',
                         borderRadius: '12px',
                         fontSize: '0.85rem',
                         fontWeight: 'bold',
-                        backgroundColor: u.is_banned ? '#fee2e2' : '#dcfce7',
-                        color: u.is_banned ? '#b91c1c' : '#15803d',
+                        backgroundColor: u.active ? '#dcfce7' : '#fee2e2',
+                        color: u.active ? '#15803d' : '#b91c1c',
                       }}>
-                        {u.is_banned ? 'Banni' : 'Actif'}
+                        {u.active ? 'Actif' : 'Inactif'}
                       </span>
                     </td>
                     <td style={tableCell}>
                       <button
-                        onClick={() => handleToggleBan(u)}
-                        style={{ ...actionBtnStyle, backgroundColor: u.is_banned ? '#10b981' : '#f59e0b', color: '#fff' }}
+                        onClick={() => handleToggleActive(u)}
+                        style={{ ...actionBtnStyle, backgroundColor: u.active ? '#f59e0b' : '#10b981', color: '#fff' }}
                       >
-                        {u.is_banned ? 'Débannir' : 'Bannir'}
+                        {u.active ? 'Désactiver' : 'Activer'}
                       </button>
                     </td>
                   </tr>
@@ -180,25 +180,28 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* 💬 MODÉRATION DES MESSAGES */}
+      {/* 💬 MESSAGES DU CHAT */}
       {activeTab === 'messages' && (
         <div style={{ backgroundColor: '#ffffff', borderRadius: '10px', padding: '24px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
           <h2 style={{ marginTop: 0, color: '#1e293b' }}>Messages du Chat</h2>
           {messages.length === 0 ? (
-            <p style={{ color: '#64748b' }}>Aucun message trouvé.</p>
+            <p style={{ color: '#64748b' }}>Aucun message dans la base de données.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
               {messages.map((m) => (
                 <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                   <div>
-                    <strong style={{ color: '#0f172a' }}>{m.user_email || m.username || m.sender || 'Utilisateur'}</strong>
-                    <p style={{ margin: '6px 0 0 0', color: '#334155' }}>{m.content || m.text || m.message}</p>
+                    <strong style={{ color: '#0f172a' }}>{m.sender_email || m.sender || 'Expéditeur'}</strong>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b', marginLeft: '10px' }}>
+                      ➜ {m.receiver_email || m.receiver || (m.is_group ? 'Groupe' : 'Destinataire')}
+                    </span>
+                    <p style={{ margin: '6px 0 0 0', color: '#334155' }}>{m.content}</p>
                   </div>
                   <button
                     onClick={() => handleDeleteMessage(m.id)}
                     style={{ ...actionBtnStyle, backgroundColor: '#ef4444', color: '#fff' }}
                   >
-                    Supprimer du chat
+                    Supprimer
                   </button>
                 </div>
               ))}
